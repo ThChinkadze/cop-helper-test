@@ -4,10 +4,64 @@ const TIMEOUT_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?
 
 let parsedDatabase = [];
 let currentCode = "uk";
+let searchDebounceTimer;
+
+const TYPE_LABELS = {
+    'F': 'Федеральная',
+    'R': 'Региональная',
+    'F/R': 'Федеральная/Региональная',
+    'FIN': 'Финансовая',
+    'R/FIN': 'Региональная/Финансовая'
+};
+
+const CACHE_KEY = 'majestic_portland_pravovaya_baza_cache_v1';
+
+function saveCache(data) {
+    try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ data, savedAt: Date.now() }));
+    } catch (e) {
+        console.warn('Не удалось сохранить локальный кэш данных', e);
+    }
+}
+
+function loadCache() {
+    try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !Array.isArray(parsed.data)) return null;
+        return parsed;
+    } catch (e) {
+        return null;
+    }
+}
+
+function removeStaleBanner() {
+    const banner = document.getElementById('staleDataBanner');
+    if (banner) banner.remove();
+}
+
+function showStaleBanner(savedAt) {
+    removeStaleBanner();
+    const dateStr = new Date(savedAt).toLocaleString('ru-RU');
+    const banner = document.createElement('div');
+    banner.id = 'staleDataBanner';
+    banner.className = 'stale-banner';
+    banner.innerHTML = `
+        Не удалось обновить данные. Показана последняя сохранённая версия от ${dateStr}.
+        <button id="retryStaleBtn">Обновить</button>
+    `;
+    document.querySelector('.controls-container').appendChild(banner);
+    document.getElementById('retryStaleBtn').addEventListener('click', loadData);
+}
 
 async function loadData() {
+    const container = document.getElementById('articlesContainer');
     try {
         const response = await fetch(TIMEOUT_URL);
+        if (!response.ok) {
+            throw new Error(`Сервер ответил с ошибкой: ${response.status}`);
+        }
         const text = await response.text();
         const json = JSON.parse(text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1));
         const rows = json.table.rows;
@@ -35,8 +89,42 @@ async function loadData() {
                 tags: getVal(10)   
             });
         });
+        saveCache(parsedDatabase);
+        removeStaleBanner();
         renderArticles();
-    } catch (e) { console.error(e); }
+    } catch (e) {
+        console.error(e);
+        const cached = loadCache();
+        if (cached) {
+            parsedDatabase = cached.data;
+            renderArticles();
+            showStaleBanner(cached.savedAt);
+        } else {
+            container.innerHTML = `
+                <div class="loader">
+                    Не удалось загрузить базу данных. Проверьте интернет-соединение и попробуйте снова.<br>
+                    <button id="retryLoadBtn" class="tab-btn" style="margin-top: 12px; flex: none; padding: 10px 20px;">Повторить попытку</button>
+                </div>
+            `;
+            const retryBtn = document.getElementById('retryLoadBtn');
+            if (retryBtn) {
+                retryBtn.addEventListener('click', () => {
+                    container.innerHTML = `<div class="loader">Синхронизация данных...</div>`;
+                    loadData();
+                });
+            }
+        }
+    }
+}
+
+function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
 }
 
 function renderArticles() {
@@ -47,7 +135,7 @@ function renderArticles() {
 
     let searchWords = [];
     if (isSearching) {
-        searchWords = filterText.split(/\s+/).filter(w => w.length > 1);
+        searchWords = filterText.split(/\s+/).filter(w => w.length > 1 || /^\d+$/.test(w));
     }
 
     let matchedArticles = [];
@@ -86,22 +174,30 @@ function renderArticles() {
         const card = document.createElement('div');
         card.className = `card ${article.code}`;
         
-        // Подсветка слов
+        // Подсветка слов (работает поверх уже экранированного текста)
         const highlightText = (text) => {
             if (!isSearching) return text;
             let result = text;
             searchWords.forEach(word => {
-                const regex = new RegExp(`(${word})`, 'gi');
+                const regex = new RegExp(`(${escapeRegex(word)})`, 'gi');
                 result = result.replace(regex, '<span class="highlight">$1</span>');
             });
             return result;
         };
 
-        const highlightedTitle = highlightText(article.title);
-        const highlightedNum = highlightText(article.num);
-        const highlightedDesc = highlightText(article.desc).replace(/\n/g, '<br>');
+        const highlightedTitle = highlightText(escapeHtml(article.title));
+        const highlightedNum = highlightText(escapeHtml(article.num));
+        const highlightedDesc = highlightText(escapeHtml(article.desc)).replace(/\n/g, '<br>');
 
-        let typeHtml = (article.code === 'uk' && article.type && article.type !== '-') ? `<div class="article-type">${article.type}</div>` : '';
+        const safeType = escapeHtml(article.type);
+        const typeLabel = TYPE_LABELS[article.type] || '';
+        let typeHtml = (article.code === 'uk' && safeType && safeType !== '-') ? `<div class="article-type" title="${escapeHtml(typeLabel)}">${safeType}</div>` : '';
+
+        const safeFine = escapeHtml(article.fine);
+        const safeStars = escapeHtml(article.stars);
+        const safeArrest = escapeHtml(article.arrest);
+        const safeFelony = escapeHtml(article.felony);
+        const safeExtraMeasure = escapeHtml(article.extraMeasure);
 
         card.innerHTML = `
             <div class="card-header">
@@ -109,11 +205,11 @@ function renderArticles() {
                 <div class="card-header-right">${typeHtml}<div class="article-num">ст. ${highlightedNum}</div></div>
             </div>
             <div class="info-table">
-                <div class="info-row"><div class="info-label">Штраф</div><div class="info-val">${article.fine || '—'}</div></div>
-                <div class="info-row"><div class="info-label">Розыск</div><div class="info-val">${article.stars || '—'}</div></div>
-                <div class="info-row"><div class="info-label">Арест</div><div class="info-val">${article.arrest || '—'}</div></div>
-                <div class="info-row"><div class="info-label">Судимость</div><div class="info-val ${article.felony.toLowerCase().includes('судимость') ? 'danger' : ''}">${article.felony || '—'}</div></div>
-                <div class="info-row"><div class="info-label">Доп. мера</div><div class="info-val">${article.extraMeasure || '—'}</div></div>
+                <div class="info-row"><div class="info-label">Штраф</div><div class="info-val">${safeFine || '—'}</div></div>
+                <div class="info-row"><div class="info-label">Розыск</div><div class="info-val">${safeStars || '—'}</div></div>
+                <div class="info-row"><div class="info-label">Арест</div><div class="info-val">${safeArrest || '—'}</div></div>
+                <div class="info-row"><div class="info-label">Судимость</div><div class="info-val ${article.felony.toLowerCase().includes('судимость') ? 'danger' : ''}">${safeFelony || '—'}</div></div>
+                <div class="info-row"><div class="info-label">Доп. мера</div><div class="info-val">${safeExtraMeasure || '—'}</div></div>
             </div>
             <div class="desc">${highlightedDesc}</div>
         `;
@@ -130,6 +226,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click
     e.target.classList.add('active');
     currentCode = e.target.getAttribute('data-code');
     
+    clearTimeout(searchDebounceTimer);
     const searchInput = document.getElementById('searchInput');
     if (searchInput.value !== "") {
         searchInput.value = "";
@@ -137,5 +234,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click
     renderArticles();
 }));
 
-document.getElementById('searchInput').addEventListener('input', renderArticles);
+document.getElementById('searchInput').addEventListener('input', () => {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(renderArticles, 150);
+});
 loadData();
