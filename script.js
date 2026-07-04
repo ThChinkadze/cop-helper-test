@@ -10,6 +10,12 @@ const CODE_LABELS = {
     dk: 'ДК'
 };
 
+const TAB_LABELS = {
+    uk: 'Уголовный кодекс',
+    ak: 'Административный кодекс',
+    dk: 'Дорожный кодекс'
+};
+
 const synonymsDictionary = {
     штраф: ['штраф', 'деньги', 'выплата', 'оплата', 'санкция'],
     арест: ['арест', 'задержание', 'тюрьма', 'заключение'],
@@ -37,6 +43,7 @@ document.addEventListener('DOMContentLoaded', init);
 async function init() {
     isCompactMode = localStorage.getItem(STORAGE_KEYS.compactMode) === 'true';
 
+    applyTabLabels();
     applyCompactModeState();
 
     bindEvents();
@@ -92,6 +99,16 @@ function bindEvents() {
     });
 }
 
+function applyTabLabels() {
+    tabButtons.forEach((button) => {
+        const code = button.dataset.code;
+
+        if (TAB_LABELS[code]) {
+            button.textContent = TAB_LABELS[code];
+        }
+    });
+}
+
 function applyCompactModeState() {
     viewToggle.classList.toggle('active', isCompactMode);
     viewToggle.setAttribute('aria-pressed', String(isCompactMode));
@@ -134,15 +151,15 @@ function normalizeArticleRow(headers, row) {
     return {
         code: getValue(raw, ['code', 'кодекс', 'kodeks', 'typecode']).toLowerCase(),
         num: getValue(raw, ['num', 'номер', 'article', 'статья', 'ст']),
-        type: getValue(raw, ['type', 'тип', 'категория']),
+        type: getValue(raw, ['type', 'тип', 'типстатьи', 'категория']),
         title: getValue(raw, ['title', 'название', 'заголовок', 'name']),
         desc: getValue(raw, ['desc', 'description', 'описание', 'текст']),
         fine: getValue(raw, ['fine', 'штраф']),
-        stars: getValue(raw, ['stars', 'розыск', 'wanted']),
+        stars: getValue(raw, ['stars', 'звёзды', 'звезды', 'розыск', 'wanted']),
         arrest: getValue(raw, ['arrest', 'арест']),
         felony: getValue(raw, ['felony', 'судимость']),
-        additional: getValue(raw, ['additional', 'дополнительно', 'мера', 'допмера', 'extra']),
-        tags: getValue(raw, ['tags', 'теги', 'ключи'])
+        additional: getValue(raw, ['additional', 'доп_мера', 'допмера', 'допмера', 'дополнительно', 'мера', 'extra']),
+        tags: getValue(raw, ['tags', 'теги', 'тегидляпоиска', 'ключи'])
     };
 }
 
@@ -225,23 +242,43 @@ function renderCardArticle(article, searchWords) {
     const desc = highlightText(article.desc, searchWords);
     const type = highlightText(article.type, searchWords);
 
+    const infoRows = [];
+
+    if (article.fine) {
+        infoRows.push(renderInfoRow('Штраф', article.fine, searchWords));
+    }
+
+    if (article.code === 'uk') {
+        if (article.stars) {
+            infoRows.push(renderInfoRow('Звёзды', article.stars, searchWords, 'danger'));
+        }
+
+        if (article.arrest) {
+            infoRows.push(renderInfoRow('Арест', article.arrest, searchWords, 'danger'));
+        }
+
+        if (article.felony) {
+            infoRows.push(renderInfoRow('Судимость', article.felony, searchWords, 'danger'));
+        }
+    }
+
+    if ((article.code === 'ak' || article.code === 'dk') && article.additional) {
+        infoRows.push(renderInfoRow('Доп. мера', article.additional, searchWords));
+    }
+
     return `
         <article class="card ${codeClass}">
             <div class="card-header">
                 <div class="title">${title}</div>
 
                 <div class="card-header-right">
-                    ${article.type ? `<div class="article-type">${type}</div>` : ''}
+                    ${article.code === 'uk' && article.type ? `<div class="article-type">${type}</div>` : ''}
                     <div class="article-num">${CODE_LABELS[article.code] || article.code} ${num}</div>
                 </div>
             </div>
 
             <div class="info-table">
-                ${renderInfoRow('Штраф', article.fine, searchWords)}
-                ${renderInfoRow('Розыск', article.stars, searchWords, 'danger')}
-                ${renderInfoRow('Арест', article.arrest, searchWords, 'danger')}
-                ${renderInfoRow('Судимость', article.felony, searchWords, 'danger')}
-                ${renderInfoRow('Доп. мера', article.additional, searchWords)}
+                ${infoRows.join('')}
             </div>
 
             <div class="desc">${desc || 'Описание отсутствует'}</div>
@@ -266,8 +303,12 @@ function renderCompactArticle(article, searchWords) {
     }
 
     if (article.code === 'uk') {
+        if (article.type) {
+            metaItems.push(renderCompactPill('Тип', article.type, searchWords));
+        }
+
         if (article.stars) {
-            metaItems.push(renderCompactPill('Розыск', article.stars, searchWords, 'danger'));
+            metaItems.push(renderCompactPill('Звёзды', article.stars, searchWords, 'danger'));
         }
 
         if (article.arrest) {
@@ -279,8 +320,8 @@ function renderCompactArticle(article, searchWords) {
         }
     }
 
-    if (article.additional) {
-        metaItems.push(renderCompactPill('Доп.', article.additional, searchWords));
+    if ((article.code === 'ak' || article.code === 'dk') && article.additional) {
+        metaItems.push(renderCompactPill('Доп. мера', article.additional, searchWords));
     }
 
     return `
@@ -290,7 +331,7 @@ function renderCompactArticle(article, searchWords) {
 
                 <div class="compact-main">
                     <div class="compact-title">${title}</div>
-                    ${article.type ? `<div class="compact-type">${type}</div>` : ''}
+                    ${article.code === 'uk' && article.type ? `<div class="compact-type">${type}</div>` : ''}
                 </div>
 
                 <div class="compact-meta">
