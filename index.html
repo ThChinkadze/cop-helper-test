@@ -3,31 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Законодательная база | Portland</title>
-
+    <title>Законадательная база | Portland</title>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
     <div class="controls-container">
         <input type="text" id="searchInput" placeholder="Опишите ситуацию, введите фразу или номер...">
-
-        <div class="toolbar">
-            <div class="tabs">
-                <button class="tab-btn active" data-code="uk">Уголовеый Кодекс</button>
-                <button class="tab-btn" data-code="ak">Административный Кодекс</button>
-                <button class="tab-btn" data-code="dk">Дорожный Кодекс</button>
-            </div>
-
-            <button id="toggleView" class="view-btn">Компактный режим</button>
+        <div class="tabs">
+            <button class="tab-btn active" data-code="uk">Уголовный кодекс</button>
+            <button class="tab-btn" data-code="ak">Административный кодекс</button> 
+            <button class="tab-btn" data-code="dk">Дорожный кодекс</button>
         </div>
     </div>
 
-    <div id="articlesContainer">
-        <div class="loader">Синхронизация данных...</div>
-    </div>
+    <div id="articlesContainer"><div class="loader">Синхронизация данных...</div></div>
 
     <script src="script.js"></script>
 </body>
