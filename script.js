@@ -3,175 +3,217 @@ const SHEET_NAME = encodeURIComponent('База данных');
 const TIMEOUT_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}&headers=0`;
 
 let parsedDatabase = [];
+let filteredCache = [];
 let currentCode = "uk";
-let viewMode = "card";
 
 const searchInput = document.getElementById('searchInput');
 const container = document.getElementById('articlesContainer');
 
-/* LOAD DATA */
+/* ---------------------------
+   1. SAFE FETCH + PARSE
+----------------------------*/
 async function loadData() {
-    const res = await fetch(TIMEOUT_URL);
-    const text = await res.text();
+    try {
+        const response = await fetch(TIMEOUT_URL);
+        const text = await response.text();
 
-    const json = JSON.parse(
-        text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)
-    );
+        const jsonStart = text.indexOf('{');
+        const jsonEnd = text.lastIndexOf('}');
 
-    parsedDatabase = (json?.table?.rows || [])
-        .map(row => {
-            const c = row.c || [];
+        if (jsonStart === -1 || jsonEnd === -1) {
+            throw new Error('Invalid Google Sheets response');
+        }
 
-            const get = i => (c[i]?.v ?? c[i]?.f ?? "").toString().trim();
+        const json = JSON.parse(text.slice(jsonStart, jsonEnd + 1));
+        const rows = json?.table?.rows || [];
 
-            const codeMap = { UK: "uk", AK: "ak", DK: "dk" };
-            const code = codeMap[get(0).toUpperCase()];
+        parsedDatabase = rows
+            .filter(row => row?.c)
+            .map(row => {
+                const cells = row.c;
 
-            if (!code) return null;
+                const get = (i) =>
+                    (cells[i]?.f ?? cells[i]?.v ?? "")
+                        .toString()
+                        .trim();
 
-            const title = get(2);
-            const desc = get(3);
+                const rawCode = get(0).toUpperCase();
 
-            return {
-                code,
-                num: get(1),
-                title,
-                desc,
-                stars: get(4),
-                fine: get(6),
-                arrest: get(7),
-                felony: get(8),
-                type: get(9),
-                extra: get(5),
-                searchText: (get(1) + " " + title + " " + desc).toLowerCase()
-            };
-        })
-        .filter(Boolean);
+                const map = { UK: "uk", AK: "ak", DK: "dk" };
+                const code = map[rawCode];
 
-    render();
+                if (!code) return null;
+
+                const title = get(2) || (get(3).split(/[.\n]/)[0].trim() + '.');
+                const desc = get(3) || get(2);
+
+                return {
+                    code,
+                    num: get(1),
+                    title,
+                    desc,
+                    stars: get(4),
+                    extraMeasure: get(5),
+                    fine: get(6),
+                    arrest: get(7),
+                    felony: get(8),
+                    type: get(9),
+                    tags: get(10),
+
+                    // precomputed field for search speed
+                    searchText: `${get(1)} ${title} ${desc} ${get(10)}`.toLowerCase()
+                };
+            })
+            .filter(Boolean);
+
+        applyFilters();
+    } catch (e) {
+        console.error("Load error:", e);
+        container.innerHTML = `<div class="loader">Ошибка загрузки данных</div>`;
+    }
 }
 
-/* FILTER */
-function filterData() {
-    const q = searchInput.value.toLowerCase().trim();
-    const words = q ? q.split(/\s+/) : [];
+/* ---------------------------
+   2. SEARCH / FILTER ENGINE
+----------------------------*/
+function getSearchWords(text) {
+    return text
+        .toLowerCase()
+        .trim()
+        .split(/\s+/)
+        .filter(w => w.length > 1);
+}
 
-    let data = parsedDatabase.filter(x => x.code === currentCode);
+function scoreArticle(article, words) {
+    let score = 0;
 
-    if (words.length) {
-        data = data
-            .map(a => ({
-                a,
-                score: words.filter(w => a.searchText.includes(w)).length
-            }))
-            .filter(x => x.score > 0)
-            .sort((a, b) => b.score - a.score)
-            .map(x => x.a);
+    for (const w of words) {
+        if (article.searchText.includes(w)) score++;
     }
 
-    return data;
+    return score;
 }
 
-/* RENDER */
-function render() {
-    const data = filterData();
+function applyFilters() {
+    const query = searchInput.value.trim();
+    const isSearch = query.length > 0;
+
+    const words = isSearch ? getSearchWords(query) : [];
+
+    let list = parsedDatabase;
+
+    // tab filter first (cheap operation)
+    if (!isSearch) {
+        list = list.filter(a => a.code === currentCode);
+    }
+
+    // scoring only if search active
+    if (isSearch) {
+        list = list
+            .map(a => ({ article: a, score: scoreArticle(a, words) }))
+            .filter(x => x.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .map(x => x.article);
+    }
+
+    filteredCache = list;
+    render(list, words, isSearch);
+}
+
+/* ---------------------------
+   3. RENDER (ONLY UI)
+----------------------------*/
+function render(list, words, isSearch) {
     container.innerHTML = "";
 
-    if (!data.length) {
-        container.innerHTML = "Ничего не найдено";
+    if (!list.length) {
+        container.innerHTML = `<div class="loader">Ничего не найдено</div>`;
         return;
     }
 
-    for (const a of data) {
-        if (viewMode === "card") {
-            container.appendChild(renderCard(a));
-        } else {
-            container.appendChild(renderRow(a));
+    const highlight = (text) => {
+        if (!isSearch) return text;
+
+        let result = text;
+
+        for (const w of words) {
+            const safe = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(${safe})`, 'gi');
+            result = result.replace(regex, '<span class="highlight">$1</span>');
         }
-    }
-}
 
-/* CARD */
-function renderCard(a) {
-    const div = document.createElement("div");
-    div.className = `card ${a.code}`;
+        return result;
+    };
 
-    div.innerHTML = `
-        <div class="title">${a.title}</div>
-        <div>Ст. ${a.num}</div>
-        <div>Штраф: ${a.fine || "—"}</div>
-        <div>Арест: ${a.arrest || "—"}</div>
-        <div>Судимость: ${a.felony || "—"}</div>
-    `;
+    const frag = document.createDocumentFragment();
 
-    return div;
-}
+    for (const article of list) {
+        const card = document.createElement('div');
+        card.className = `card ${article.code}`;
 
-/* COMPACT ROW */
-function renderRow(a) {
-    const wrapper = document.createElement("div");
+        const felonySafe = (article.felony || "").toLowerCase();
 
-    const row = document.createElement("div");
-    row.className = `compact-row ${a.code}`;
+        card.innerHTML = `
+            <div class="card-header">
+                <div class="title">${highlight(article.title)}</div>
+                <div class="card-header-right">
+                    ${article.type && article.type !== '-' && article.code === 'uk'
+                        ? `<div class="article-type">${article.type}</div>` : ''}
+                    <div class="article-num">ст. ${highlight(article.num)}</div>
+                </div>
+            </div>
 
-    const isUK = a.code === "uk";
+            <div class="info-table">
+                <div class="info-row"><div class="info-label">Штраф</div><div class="info-val">${article.fine || '—'}</div></div>
+                <div class="info-row"><div class="info-label">Розыск</div><div class="info-val">${article.stars || '—'}</div></div>
+                <div class="info-row"><div class="info-label">Арест</div><div class="info-val">${article.arrest || '—'}</div></div>
+                <div class="info-row">
+                    <div class="info-label">Судимость</div>
+                    <div class="info-val ${felonySafe.includes('судимость') ? 'danger' : ''}">
+                        ${article.felony || '—'}
+                    </div>
+                </div>
+                <div class="info-row"><div class="info-label">Доп. мера</div><div class="info-val">${article.extraMeasure || '—'}</div></div>
+            </div>
 
-    row.innerHTML = isUK
-        ? `
-            <span>${a.num}</span>
-            <span>${a.title}</span>
-            <span>${a.stars || "—"}</span>
-            <span>${a.fine || "—"}</span>
-            <span>${a.arrest || "—"}</span>
-            <span>${a.felony || "—"}</span>
-        `
-        : `
-            <span>${a.num}</span>
-            <span>${a.title}</span>
-            <span>${a.extra || "—"}</span>
-            <span>${a.fine || "—"}</span>
+            <div class="desc">${highlight(article.desc).replace(/\n/g, '<br>')}</div>
         `;
 
-    const desc = document.createElement("div");
-    desc.className = "compact-desc";
-    desc.textContent = a.desc;
+        frag.appendChild(card);
+    }
 
-    row.onclick = () => {
-        desc.style.display = desc.style.display === "block" ? "none" : "block";
-    };
-
-    wrapper.appendChild(row);
-    wrapper.appendChild(desc);
-
-    return wrapper;
+    container.appendChild(frag);
 }
 
-/* EVENTS */
-searchInput.addEventListener("input", debounce(render, 200));
-
-document.querySelectorAll(".tab-btn").forEach(btn => {
-    btn.onclick = () => {
-        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-
-        currentCode = btn.dataset.code;
-        render();
+/* ---------------------------
+   4. DEBOUNCE INPUT
+----------------------------*/
+function debounce(fn, delay = 250) {
+    let t;
+    return (...args) => {
+        clearTimeout(t);
+        t = setTimeout(() => fn(...args), delay);
     };
+}
+
+/* ---------------------------
+   5. EVENTS
+----------------------------*/
+searchInput.addEventListener('input', debounce(applyFilters, 200));
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+
+        currentCode = e.target.dataset.code;
+
+        searchInput.value = "";
+        applyFilters();
+    });
 });
 
-document.getElementById("toggleView").onclick = () => {
-    viewMode = viewMode === "card" ? "compact" : "card";
-    render();
-};
-
-/* DEBOUNCE */
-function debounce(fn, t) {
-    let id;
-    return (...args) => {
-        clearTimeout(id);
-        id = setTimeout(() => fn(...args), t);
-    };
-}
-
-/* INIT */
+/* ---------------------------
+   INIT
+----------------------------*/
 loadData();
