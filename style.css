@@ -1,219 +1,219 @@
-const SHEET_ID = '1ECGNHLbqR8KuPV_QH1E0SO8mGUOm4WIYP-hWWR5PZ-U';
-const SHEET_NAME = encodeURIComponent('База данных');
-const TIMEOUT_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}&headers=0`;
-
-let parsedDatabase = [];
-let filteredCache = [];
-let currentCode = "uk";
-
-const searchInput = document.getElementById('searchInput');
-const container = document.getElementById('articlesContainer');
-
-/* ---------------------------
-   1. SAFE FETCH + PARSE
-----------------------------*/
-async function loadData() {
-    try {
-        const response = await fetch(TIMEOUT_URL);
-        const text = await response.text();
-
-        const jsonStart = text.indexOf('{');
-        const jsonEnd = text.lastIndexOf('}');
-
-        if (jsonStart === -1 || jsonEnd === -1) {
-            throw new Error('Invalid Google Sheets response');
-        }
-
-        const json = JSON.parse(text.slice(jsonStart, jsonEnd + 1));
-        const rows = json?.table?.rows || [];
-
-        parsedDatabase = rows
-            .filter(row => row?.c)
-            .map(row => {
-                const cells = row.c;
-
-                const get = (i) =>
-                    (cells[i]?.f ?? cells[i]?.v ?? "")
-                        .toString()
-                        .trim();
-
-                const rawCode = get(0).toUpperCase();
-
-                const map = { UK: "uk", AK: "ak", DK: "dk" };
-                const code = map[rawCode];
-
-                if (!code) return null;
-
-                const title = get(2) || (get(3).split(/[.\n]/)[0].trim() + '.');
-                const desc = get(3) || get(2);
-
-                return {
-                    code,
-                    num: get(1),
-                    title,
-                    desc,
-                    stars: get(4),
-                    extraMeasure: get(5),
-                    fine: get(6),
-                    arrest: get(7),
-                    felony: get(8),
-                    type: get(9),
-                    tags: get(10),
-
-                    // precomputed field for search speed
-                    searchText: `${get(1)} ${title} ${desc} ${get(10)}`.toLowerCase()
-                };
-            })
-            .filter(Boolean);
-
-        applyFilters();
-    } catch (e) {
-        console.error("Load error:", e);
-        container.innerHTML = `<div class="loader">Ошибка загрузки данных</div>`;
-    }
+:root {
+    --bg-color: #141414;
+    --card-bg: #1e1e1e;
+    --text-main: #9a9a9e;
+    --text-title: #ffffff;
+    --accent: #007acc;
+    --stars: #ffd700;
+    --uk-color: #ff3b30;
+    --ak-color: #ff9500;
+    --dk-color: #007aff;
+    --success: #34c759;
+    --card-height: 350px; 
 }
 
-/* ---------------------------
-   2. SEARCH / FILTER ENGINE
-----------------------------*/
-function getSearchWords(text) {
-    return text
-        .toLowerCase()
-        .trim()
-        .split(/\s+/)
-        .filter(w => w.length > 1);
+body { 
+    font-family: 'Nunito', sans-serif; 
+    background-color: var(--bg-color); 
+    color: var(--text-main); 
+    margin: 0; padding: 20px; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
 }
 
-function scoreArticle(article, words) {
-    let score = 0;
-
-    for (const w of words) {
-        if (article.searchText.includes(w)) score++;
-    }
-
-    return score;
+.controls-container { 
+    width: 100%; max-width: 900px; 
+    position: sticky; top: 0; z-index: 100; 
+    padding-top: 10px; padding-bottom: 20px; 
 }
 
-function applyFilters() {
-    const query = searchInput.value.trim();
-    const isSearch = query.length > 0;
+#searchInput { 
+    width: 100%; 
+    padding: 16px 20px; 
+    font-size: 18px; 
+    font-family: 'Nunito', sans-serif; 
+    background-color: #2c2c2e; 
+    color: white; 
+    border: 2px solid transparent; 
+    border-radius: 10px; 
+    outline: none; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4); 
+    transition: border-color 0.2s; 
+    box-sizing: border-box; 
+    margin-bottom: 15px; 
 
-    const words = isSearch ? getSearchWords(query) : [];
-
-    let list = parsedDatabase;
-
-    // tab filter first (cheap operation)
-    if (!isSearch) {
-        list = list.filter(a => a.code === currentCode);
-    }
-
-    // scoring only if search active
-    if (isSearch) {
-        list = list
-            .map(a => ({ article: a, score: scoreArticle(a, words) }))
-            .filter(x => x.score > 0)
-            .sort((a, b) => b.score - a.score)
-            .map(x => x.article);
-    }
-
-    filteredCache = list;
-    render(list, words, isSearch);
 }
 
-/* ---------------------------
-   3. RENDER (ONLY UI)
-----------------------------*/
-function render(list, words, isSearch) {
-    container.innerHTML = "";
-
-    if (!list.length) {
-        container.innerHTML = `<div class="loader">Ничего не найдено</div>`;
-        return;
-    }
-
-    const highlight = (text) => {
-        if (!isSearch) return text;
-
-        let result = text;
-
-        for (const w of words) {
-            const safe = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const regex = new RegExp(`(${safe})`, 'gi');
-            result = result.replace(regex, '<span class="highlight">$1</span>');
-        }
-
-        return result;
-    };
-
-    const frag = document.createDocumentFragment();
-
-    for (const article of list) {
-        const card = document.createElement('div');
-        card.className = `card ${article.code}`;
-
-        const felonySafe = (article.felony || "").toLowerCase();
-
-        card.innerHTML = `
-            <div class="card-header">
-                <div class="title">${highlight(article.title)}</div>
-                <div class="card-header-right">
-                    ${article.type && article.type !== '-' && article.code === 'uk'
-                        ? `<div class="article-type">${article.type}</div>` : ''}
-                    <div class="article-num">ст. ${highlight(article.num)}</div>
-                </div>
-            </div>
-
-            <div class="info-table">
-                <div class="info-row"><div class="info-label">Штраф</div><div class="info-val">${article.fine || '—'}</div></div>
-                <div class="info-row"><div class="info-label">Розыск</div><div class="info-val">${article.stars || '—'}</div></div>
-                <div class="info-row"><div class="info-label">Арест</div><div class="info-val">${article.arrest || '—'}</div></div>
-                <div class="info-row">
-                    <div class="info-label">Судимость</div>
-                    <div class="info-val ${felonySafe.includes('судимость') ? 'danger' : ''}">
-                        ${article.felony || '—'}
-                    </div>
-                </div>
-                <div class="info-row"><div class="info-label">Доп. мера</div><div class="info-val">${article.extraMeasure || '—'}</div></div>
-            </div>
-
-            <div class="desc">${highlight(article.desc).replace(/\n/g, '<br>')}</div>
-        `;
-
-        frag.appendChild(card);
-    }
-
-    container.appendChild(frag);
+#searchInput:focus { 
+    border-color: var(--accent); 
 }
 
-/* ---------------------------
-   4. DEBOUNCE INPUT
-----------------------------*/
-function debounce(fn, delay = 250) {
-    let t;
-    return (...args) => {
-        clearTimeout(t);
-        t = setTimeout(() => fn(...args), delay);
-    };
+.tabs { 
+    display: flex; 
+    gap: 10px; 
+    width: 100%; 
+    overflow-x: auto; 
+    padding-bottom: 5px; 
 }
 
-/* ---------------------------
-   5. EVENTS
-----------------------------*/
-searchInput.addEventListener('input', debounce(applyFilters, 200));
+.tab-btn { 
+    flex: 1; 
+    padding: 14px; 
+    font-family: 'Nunito', sans-serif; 
+    font-size: 15px; 
+    font-weight: 800; 
+    background-color: #2c2c2e; 
+    color: #8e8e93; 
+    border: none; 
+    border-radius: 8px; 
+    cursor: pointer; 
+    transition: all 0.2s ease; 
+    white-space: nowrap; 
+}
 
-document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
+.tab-btn:hover { 
+    background-color: #3a3a3c; 
+    color: #fff; 
+}
 
-        currentCode = e.target.dataset.code;
+.tab-btn.active { 
+    background-color: var(--accent); 
+    color: white; 
+}
 
-        searchInput.value = "";
-        applyFilters();
-    });
-});
+#articlesContainer { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); 
+    gap: 20px; 
+    width: 100%; max-width: 1300px; 
+    margin-top: 10px; 
+}
 
-/* ---------------------------
-   INIT
-----------------------------*/
-loadData();
+.card { 
+    background-color: var(--card-bg); 
+    border-radius: 12px; 
+    padding: 16px; 
+    border: 1px solid #2c2c2e; 
+    display: grid; 
+    height: var(--card-height); 
+    grid-template-rows: max-content max-content 1fr; 
+    gap: 12px; 
+}
+
+.card.uk { border-left: 6px solid var(--uk-color); }
+.card.ak { border-left: 6px solid var(--ak-color); }
+.card.dk { border-left: 6px solid var(--dk-color); }
+
+.card-header { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: flex-start; 
+    gap: 15px; 
+    overflow: hidden; 
+    min-height: 42px; 
+}
+
+.title { 
+    font-size: 16px; 
+    font-weight: 800; 
+    color: var(--text-title); 
+    line-height: 1.3; 
+    margin: 0; 
+    display: 
+    -webkit-box; 
+    -webkit-line-clamp: 2; 
+    -webkit-box-orient: vertical; 
+    overflow: hidden; 
+
+}
+
+.article-num { 
+    font-size: 13px; 
+    font-weight: 700; 
+    color: #e2e2e6; 
+    background-color: #2c2c2e; 
+    padding: 4px 10px; 
+    border-radius: 6px; 
+    border: 1px solid #3a3a3c; 
+    white-space: nowrap; 
+}
+
+.info-table { 
+    background-color: #262628; 
+    border-radius: 8px; 
+    padding: 10px 12px; 
+    border: 1px solid #3a3a3c; 
+    display: flex; 
+    flex-direction: column; 
+    gap: 6px; 
+}
+
+.info-row { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: flex-start; 
+    gap: 10px; 
+    font-size: 13px; 
+    border-bottom: 1px dashed #3a3a3c; 
+    padding-bottom: 4px; 
+}
+
+.info-label { 
+    color: #8e8e93; 
+    font-weight: 600; 
+    flex-shrink: 0; 
+}
+
+.info-val { 
+    color: #ffffff; 
+    font-weight: 800; 
+    text-align: right; 
+    max-width: 70%; 
+    word-break: break-word; 
+}
+
+.info-val.danger { color: var(--uk-color); }
+
+.desc { 
+    font-size: 13px; 
+    line-height: 1.4; 
+    color: var(--text-main); 
+    border-top: 1px solid #252525; 
+    padding-top: 8px; 
+    margin: 0; 
+    overflow-y: auto; 
+}
+
+.loader { 
+    text-align: center; 
+    font-size: 18px; 
+    margin-top: 50px; 
+    grid-column: 1 / -1; 
+}
+
+.highlight {
+    background-color: rgba(255, 215, 0, 0.25);
+    color: #ffd700;
+    border-radius: 3px;
+    padding: 0 2px;
+    font-weight: bold;
+}
+
+.card-header-right { 
+    display: flex; 
+    align-items: center; 
+    gap: 8px; 
+    flex-shrink: 0; 
+}
+
+.article-type { 
+    font-size: 11px; 
+    font-weight: 800; 
+    color: #636366; 
+    background-color: transparent;
+    border: 1px solid #3a3a3c;
+    padding: 3px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
