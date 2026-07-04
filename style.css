@@ -305,3 +305,133 @@ body {
 .stale-banner button:hover {
     filter: brightness(1.1);
 }
+
+/* ===== Компактный вид (список строк) ===== */
+
+#articlesContainer.list-view {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.row {
+    background-color: var(--card-bg);
+    border-radius: 12px;
+    border: 1px solid #2c2c2e;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.row:hover {
+    background-color: #242426;
+    border-color: #3a3a3c;
+}
+
+.row.uk { border-left: 6px solid var(--uk-color); }
+.row.ak { border-left: 6px solid var(--ak-color); }
+.row.dk { border-left: 6px solid var(--dk-color); }
+
+.row-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex: 1;
+}
+
+.row-type {
+    font-size: 11px;
+    font-weight: 800;
+    color: #636366;
+    background-color: transparent;
+    border: 1px solid #3a3a3c;
+    padding: 3px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    cursor: help;
+    flex-shrink: 0;
+}
+
+.row-num {
+    font-size: 13px;
+    font-weight: 700;
+    color: #e2e2e6;
+    background-color: #2c2c2e;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #3a3a3c;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.row-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text-title);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.row-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.row-tag {
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffffff;
+    background-color: #262628;
+    border: 1px solid #3a3a3c;
+    padding: 4px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+}
+
+.row-tag.row-fine {
+    color: var(--success);
+    border-color: var(--success);
+}
+
+.row-felony {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #3a3a3c;
+    flex-shrink: 0;
+}
+
+.row-felony.active {
+    background-color: var(--uk-color);
+}
+
+@media (max-width: 480px) {
+    .row {
+        flex-wrap: wrap;
+    }
+
+    .row-left {
+        width: 100%;
+    }
+
+    .row-title {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+    }
+
+    .row-right {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+}
