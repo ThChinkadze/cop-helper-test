@@ -1,4 +1,4 @@
-const GOOGLE_SHEET_CSV_URL = 'PASTE_YOUR_GOOGLE_SHEET_CSV_URL_HERE';
+const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT84FsXQ5VFSFjp5GqXOMpyEjXOzVXUopS_Zl27jcNdpLEOPKKp1OZ8_OZ2wLQbU4FAOjKm8WoUAdxU/pub?gid=1208463204&single=true&output=csv';
 
 const STORAGE_KEYS = {
     compactMode: 'lawBaseCompactMode'
@@ -100,7 +100,7 @@ function applyCompactModeState() {
 }
 
 async function loadArticles() {
-    if (!GOOGLE_SHEET_CSV_URL || GOOGLE_SHEET_CSV_URL === 'PASTE_YOUR_GOOGLE_SHEET_CSV_URL_HERE') {
+    if (!GOOGLE_SHEET_CSV_URL || GOOGLE_SHEET_CSV_URL === 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT84FsXQ5VFSFjp5GqXOMpyEjXOzVXUopS_Zl27jcNdpLEOPKKp1OZ8_OZ2wLQbU4FAOjKm8WoUAdxU/pub?gid=1208463204&single=true&output=csv') {
         throw new Error('Не указана ссылка на Google Таблицу.');
     }
 
