@@ -6,6 +6,9 @@ let parsedDatabase = [];
 let currentCode = "uk";
 let searchDebounceTimer;
 
+const VIEW_KEY = 'majestic_portland_view_mode';
+let currentView = localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid';
+
 const TYPE_LABELS = {
     'F': 'Федеральная',
     'R': 'Региональная',
