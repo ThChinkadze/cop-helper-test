@@ -22,6 +22,12 @@ body {
     align-items: center; 
 }
 
+@media (max-width: 480px) {
+    body {
+        padding: 10px;
+    }
+}
+
 .controls-container { 
     width: 100%; max-width: 900px; 
     position: sticky; top: 0; z-index: 100; 
@@ -84,7 +90,7 @@ body {
 
 #articlesContainer { 
     display: grid; 
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); 
+    grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr)); 
     gap: 20px; 
     width: 100%; max-width: 1300px; 
     margin-top: 10px; 
@@ -216,4 +222,41 @@ body {
     padding: 3px 6px;
     border-radius: 4px;
     white-space: nowrap;
+    cursor: help;
+}
+
+.stale-banner {
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: -5px;
+    margin-bottom: 15px;
+    padding: 12px 16px;
+    background-color: rgba(255, 149, 0, 0.12);
+    border: 1px solid var(--ak-color);
+    border-radius: 8px;
+    color: #ffd8a8;
+    font-size: 13px;
+    font-weight: 700;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.stale-banner button {
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px;
+    font-weight: 800;
+    background-color: var(--ak-color);
+    color: #1e1e1e;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.stale-banner button:hover {
+    filter: brightness(1.1);
 }
