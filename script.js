@@ -229,6 +229,75 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
     });
 }
 
+// Отрисовка в виде компактного списка (строк). Логика фильтрации/поиска/сортировки уже
+// выполнена в renderArticles() — эта функция отвечает только за разметку.
+// На этом этапе строка не раскрывается по клику (см. Этап 5) и функция ещё не подключена
+// к тумблеру вида (см. Этап 6) — это отдельные шаги плана.
+function renderAsList(container, matchedArticles, isSearching, searchWords) {
+    matchedArticles.forEach(item => {
+        const article = item.article;
+
+        const row = document.createElement('div');
+        row.className = `row ${article.code}`;
+
+        // Подсветка слов (та же логика, что и в renderAsCards)
+        const highlightText = (text) => {
+            if (!isSearching) return text;
+            let result = text;
+            searchWords.forEach(word => {
+                const regex = new RegExp(`(${escapeRegex(word)})`, 'gi');
+                result = result.replace(regex, '<span class="highlight">$1</span>');
+            });
+            return result;
+        };
+
+        const highlightedTitle = highlightText(escapeHtml(article.title));
+        const highlightedNum = highlightText(escapeHtml(article.num));
+
+        const safeType = escapeHtml(article.type);
+        const typeLabel = TYPE_LABELS[article.type] || '';
+        const typeHtml = (article.code === 'uk' && safeType && safeType !== '-')
+            ? `<div class="row-type" title="${escapeHtml(typeLabel)}">${safeType}</div>`
+            : '';
+
+        // Левая часть строки: тип (только УК), номер статьи, заголовок
+        const leftHtml = `
+            ${typeHtml}
+            <div class="row-num">ст. ${highlightedNum}</div>
+            <div class="row-title">${highlightedTitle}</div>
+        `;
+
+        // Правая часть строки: для УК — звёзды/арест/судимость, для АК и ДК — доп. мера/штраф
+        let rightHtml = '';
+        if (article.code === 'uk') {
+            const safeStars = escapeHtml(article.stars);
+            const safeArrest = escapeHtml(article.arrest);
+            const hasFelony = article.felony.toLowerCase().includes('судимость');
+
+            rightHtml = `
+                ${safeStars ? `<div class="row-tag" title="Розыск">${safeStars}</div>` : ''}
+                ${safeArrest ? `<div class="row-tag" title="Арест">${safeArrest}</div>` : ''}
+                <div class="row-felony ${hasFelony ? 'active' : ''}" title="${hasFelony ? 'Есть судимость' : 'Без судимости'}"></div>
+            `;
+        } else {
+            const safeExtraMeasure = escapeHtml(article.extraMeasure);
+            const safeFine = escapeHtml(article.fine);
+
+            rightHtml = `
+                ${safeExtraMeasure ? `<div class="row-tag" title="Доп. мера">${safeExtraMeasure}</div>` : ''}
+                ${safeFine ? `<div class="row-tag row-fine" title="Штраф">${safeFine}</div>` : ''}
+            `;
+        }
+
+        row.innerHTML = `
+            <div class="row-left">${leftHtml}</div>
+            <div class="row-right">${rightHtml}</div>
+        `;
+
+        container.appendChild(row);
+    });
+}
+
 document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', (e) => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     e.target.classList.add('active');
