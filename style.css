@@ -1,230 +1,219 @@
-/* -------------------------
-   BASE
---------------------------*/
+const SHEET_ID = '1ECGNHLbqR8KuPV_QH1E0SO8mGUOm4WIYP-hWWR5PZ-U';
+const SHEET_NAME = encodeURIComponent('База данных');
+const TIMEOUT_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}&headers=0`;
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+let parsedDatabase = [];
+let filteredCache = [];
+let currentCode = "uk";
+
+const searchInput = document.getElementById('searchInput');
+const container = document.getElementById('articlesContainer');
+
+/* ---------------------------
+   1. SAFE FETCH + PARSE
+----------------------------*/
+async function loadData() {
+    try {
+        const response = await fetch(TIMEOUT_URL);
+        const text = await response.text();
+
+        const jsonStart = text.indexOf('{');
+        const jsonEnd = text.lastIndexOf('}');
+
+        if (jsonStart === -1 || jsonEnd === -1) {
+            throw new Error('Invalid Google Sheets response');
+        }
+
+        const json = JSON.parse(text.slice(jsonStart, jsonEnd + 1));
+        const rows = json?.table?.rows || [];
+
+        parsedDatabase = rows
+            .filter(row => row?.c)
+            .map(row => {
+                const cells = row.c;
+
+                const get = (i) =>
+                    (cells[i]?.f ?? cells[i]?.v ?? "")
+                        .toString()
+                        .trim();
+
+                const rawCode = get(0).toUpperCase();
+
+                const map = { UK: "uk", AK: "ak", DK: "dk" };
+                const code = map[rawCode];
+
+                if (!code) return null;
+
+                const title = get(2) || (get(3).split(/[.\n]/)[0].trim() + '.');
+                const desc = get(3) || get(2);
+
+                return {
+                    code,
+                    num: get(1),
+                    title,
+                    desc,
+                    stars: get(4),
+                    extraMeasure: get(5),
+                    fine: get(6),
+                    arrest: get(7),
+                    felony: get(8),
+                    type: get(9),
+                    tags: get(10),
+
+                    // precomputed field for search speed
+                    searchText: `${get(1)} ${title} ${desc} ${get(10)}`.toLowerCase()
+                };
+            })
+            .filter(Boolean);
+
+        applyFilters();
+    } catch (e) {
+        console.error("Load error:", e);
+        container.innerHTML = `<div class="loader">Ошибка загрузки данных</div>`;
+    }
 }
 
-body {
-    background: #0f0f0f;
-    color: #eaeaea;
-    font-family: Arial, sans-serif;
+/* ---------------------------
+   2. SEARCH / FILTER ENGINE
+----------------------------*/
+function getSearchWords(text) {
+    return text
+        .toLowerCase()
+        .trim()
+        .split(/\s+/)
+        .filter(w => w.length > 1);
 }
 
-/* -------------------------
-   SEARCH + HEADER AREA
---------------------------*/
+function scoreArticle(article, words) {
+    let score = 0;
 
-.header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px;
+    for (const w of words) {
+        if (article.searchText.includes(w)) score++;
+    }
+
+    return score;
 }
 
-#searchInput {
-    flex: 1;
-    padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid #2a2a2a;
-    background: #151515;
-    color: #fff;
-    outline: none;
+function applyFilters() {
+    const query = searchInput.value.trim();
+    const isSearch = query.length > 0;
+
+    const words = isSearch ? getSearchWords(query) : [];
+
+    let list = parsedDatabase;
+
+    // tab filter first (cheap operation)
+    if (!isSearch) {
+        list = list.filter(a => a.code === currentCode);
+    }
+
+    // scoring only if search active
+    if (isSearch) {
+        list = list
+            .map(a => ({ article: a, score: scoreArticle(a, words) }))
+            .filter(x => x.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .map(x => x.article);
+    }
+
+    filteredCache = list;
+    render(list, words, isSearch);
 }
 
-/* -------------------------
-   VIEW TOGGLE
---------------------------*/
+/* ---------------------------
+   3. RENDER (ONLY UI)
+----------------------------*/
+function render(list, words, isSearch) {
+    container.innerHTML = "";
 
-.view-toggle {
-    display: flex;
-    gap: 8px;
+    if (!list.length) {
+        container.innerHTML = `<div class="loader">Ничего не найдено</div>`;
+        return;
+    }
+
+    const highlight = (text) => {
+        if (!isSearch) return text;
+
+        let result = text;
+
+        for (const w of words) {
+            const safe = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(${safe})`, 'gi');
+            result = result.replace(regex, '<span class="highlight">$1</span>');
+        }
+
+        return result;
+    };
+
+    const frag = document.createDocumentFragment();
+
+    for (const article of list) {
+        const card = document.createElement('div');
+        card.className = `card ${article.code}`;
+
+        const felonySafe = (article.felony || "").toLowerCase();
+
+        card.innerHTML = `
+            <div class="card-header">
+                <div class="title">${highlight(article.title)}</div>
+                <div class="card-header-right">
+                    ${article.type && article.type !== '-' && article.code === 'uk'
+                        ? `<div class="article-type">${article.type}</div>` : ''}
+                    <div class="article-num">ст. ${highlight(article.num)}</div>
+                </div>
+            </div>
+
+            <div class="info-table">
+                <div class="info-row"><div class="info-label">Штраф</div><div class="info-val">${article.fine || '—'}</div></div>
+                <div class="info-row"><div class="info-label">Розыск</div><div class="info-val">${article.stars || '—'}</div></div>
+                <div class="info-row"><div class="info-label">Арест</div><div class="info-val">${article.arrest || '—'}</div></div>
+                <div class="info-row">
+                    <div class="info-label">Судимость</div>
+                    <div class="info-val ${felonySafe.includes('судимость') ? 'danger' : ''}">
+                        ${article.felony || '—'}
+                    </div>
+                </div>
+                <div class="info-row"><div class="info-label">Доп. мера</div><div class="info-val">${article.extraMeasure || '—'}</div></div>
+            </div>
+
+            <div class="desc">${highlight(article.desc).replace(/\n/g, '<br>')}</div>
+        `;
+
+        frag.appendChild(card);
+    }
+
+    container.appendChild(frag);
 }
 
-.toggle-btn {
-    padding: 6px 10px;
-    border-radius: 6px;
-    border: 1px solid #2a2a2a;
-    background: #111;
-    color: #aaa;
-    cursor: pointer;
-    transition: 0.15s;
+/* ---------------------------
+   4. DEBOUNCE INPUT
+----------------------------*/
+function debounce(fn, delay = 250) {
+    let t;
+    return (...args) => {
+        clearTimeout(t);
+        t = setTimeout(() => fn(...args), delay);
+    };
 }
 
-.toggle-btn:hover {
-    color: #fff;
-}
+/* ---------------------------
+   5. EVENTS
+----------------------------*/
+searchInput.addEventListener('input', debounce(applyFilters, 200));
 
-.toggle-btn.active {
-    background: #1e1e1e;
-    color: #fff;
-}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
 
-/* -------------------------
-   CONTAINER
---------------------------*/
+        currentCode = e.target.dataset.code;
 
-#articlesContainer {
-    padding: 16px;
-}
+        searchInput.value = "";
+        applyFilters();
+    });
+});
 
-/* -------------------------
-   CARD MODE (DEFAULT)
---------------------------*/
-
-.card {
-    background: #151515;
-    border: 1px solid #2a2a2a;
-    border-radius: 12px;
-    padding: 12px;
-    margin-bottom: 12px;
-    transition: 0.2s;
-}
-
-.card:hover {
-    transform: translateY(-1px);
-}
-
-/* Header */
-.card-header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 10px;
-}
-
-.title {
-    font-size: 16px;
-    font-weight: 600;
-}
-
-.article-num {
-    color: #aaa;
-    font-size: 13px;
-}
-
-/* Info grid */
-.info-table {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-    margin-bottom: 10px;
-}
-
-.info-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 13px;
-    color: #ccc;
-}
-
-.info-label {
-    color: #888;
-}
-
-/* Description */
-.desc {
-    font-size: 13px;
-    color: #bbb;
-    line-height: 1.4;
-}
-
-/* Highlight */
-.highlight {
-    background: #2d2d2d;
-    color: #fff;
-    padding: 1px 3px;
-    border-radius: 3px;
-}
-
-/* Loader */
-.loader {
-    text-align: center;
-    padding: 20px;
-    color: #777;
-}
-
-/* -------------------------
-   CODE COLORS (CARD MODE)
---------------------------*/
-
-.card.uk { border-left: 4px solid #ff4d4d; }
-.card.ak { border-left: 4px solid #ff9900; }
-.card.dk { border-left: 4px solid #4da3ff; }
-
-/* -------------------------
-   LINE MODE
---------------------------*/
-
-#line-mode .card {
-    width: 100%;
-    height: 150px;
-    display: flex;
-    flex-direction: row;
-    align-items: stretch;
-    overflow: hidden;
-    cursor: pointer;
-}
-
-/* left section */
-.line-left {
-    flex: 1;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-/* right section */
-.line-right {
-    width: 240px;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    border-left: 1px solid #2a2a2a;
-    color: #ccc;
-}
-
-/* CODE COLOR STRIPE */
-#line-mode .card.uk {
-    border-left: 4px solid #ff4d4d;
-}
-
-#line-mode .card.ak {
-    border-left: 4px solid #ff9900;
-}
-
-#line-mode .card.dk {
-    border-left: 4px solid #4da3ff;
-}
-
-/* line description */
-.line-desc {
-    display: none;
-    margin-top: 10px;
-    font-size: 13px;
-    color: #bbb;
-    line-height: 1.4;
-}
-
-/* expanded state */
-.line-expanded {
-    height: auto !important;
-    flex-direction: column !important;
-}
-
-.line-expanded .line-desc {
-    display: block;
-}
-
-/* -------------------------
-   SMALL ELEMENTS
---------------------------*/
-
-.article-type {
-    font-size: 12px;
-    color: #888;
-}
+/* ---------------------------
+   INIT
+----------------------------*/
+loadData();
