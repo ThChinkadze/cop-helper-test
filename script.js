@@ -132,7 +132,6 @@ function escapeHtml(str) {
 
 function renderArticles() {
     const container = document.getElementById('articlesContainer');
-    container.innerHTML = "";
     const filterText = document.getElementById('searchInput').value.toLowerCase().trim();
     const isSearching = filterText.length > 0;
 
@@ -168,12 +167,22 @@ function renderArticles() {
     // Сортируем: те, где нашлось больше слов — выше
     matchedArticles.sort((a, b) => b.matchScore - a.matchScore);
 
-    // Отрисовка
-    let count = 0;
+    container.innerHTML = "";
+
+    if (matchedArticles.length === 0) {
+        container.innerHTML = `<div class="loader">По запросу ничего не найдено. Попробуйте описать иначе.</div>`;
+        return;
+    }
+
+    renderAsCards(container, matchedArticles, isSearching, searchWords);
+}
+
+// Отрисовка в виде плиток (карточек). Логика фильтрации/поиска/сортировки уже
+// выполнена в renderArticles() — эта функция отвечает только за разметку.
+function renderAsCards(container, matchedArticles, isSearching, searchWords) {
     matchedArticles.forEach(item => {
         const article = item.article;
-        count++;
-        
+
         const card = document.createElement('div');
         card.className = `card ${article.code}`;
         
@@ -218,10 +227,6 @@ function renderArticles() {
         `;
         container.appendChild(card);
     });
-
-    if (count === 0) {
-        container.innerHTML = `<div class="loader">По запросу ничего не найдено. Попробуйте описать иначе.</div>`;
-    }
 }
 
 document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', (e) => {
