@@ -1,219 +1,230 @@
-:root {
-    --bg-color: #141414;
-    --card-bg: #1e1e1e;
-    --text-main: #9a9a9e;
-    --text-title: #ffffff;
-    --accent: #007acc;
-    --stars: #ffd700;
-    --uk-color: #ff3b30;
-    --ak-color: #ff9500;
-    --dk-color: #007aff;
-    --success: #34c759;
-    --card-height: 350px; 
+/* -------------------------
+   BASE
+--------------------------*/
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
-body { 
-    font-family: 'Nunito', sans-serif; 
-    background-color: var(--bg-color); 
-    color: var(--text-main); 
-    margin: 0; padding: 20px; 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
+body {
+    background: #0f0f0f;
+    color: #eaeaea;
+    font-family: Arial, sans-serif;
 }
 
-.controls-container { 
-    width: 100%; max-width: 900px; 
-    position: sticky; top: 0; z-index: 100; 
-    padding-top: 10px; padding-bottom: 20px; 
+/* -------------------------
+   SEARCH + HEADER AREA
+--------------------------*/
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
 }
 
-#searchInput { 
-    width: 100%; 
-    padding: 16px 20px; 
-    font-size: 18px; 
-    font-family: 'Nunito', sans-serif; 
-    background-color: #2c2c2e; 
-    color: white; 
-    border: 2px solid transparent; 
-    border-radius: 10px; 
-    outline: none; 
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4); 
-    transition: border-color 0.2s; 
-    box-sizing: border-box; 
-    margin-bottom: 15px; 
-
+#searchInput {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #2a2a2a;
+    background: #151515;
+    color: #fff;
+    outline: none;
 }
 
-#searchInput:focus { 
-    border-color: var(--accent); 
+/* -------------------------
+   VIEW TOGGLE
+--------------------------*/
+
+.view-toggle {
+    display: flex;
+    gap: 8px;
 }
 
-.tabs { 
-    display: flex; 
-    gap: 10px; 
-    width: 100%; 
-    overflow-x: auto; 
-    padding-bottom: 5px; 
+.toggle-btn {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #2a2a2a;
+    background: #111;
+    color: #aaa;
+    cursor: pointer;
+    transition: 0.15s;
 }
 
-.tab-btn { 
-    flex: 1; 
-    padding: 14px; 
-    font-family: 'Nunito', sans-serif; 
-    font-size: 15px; 
-    font-weight: 800; 
-    background-color: #2c2c2e; 
-    color: #8e8e93; 
-    border: none; 
-    border-radius: 8px; 
-    cursor: pointer; 
-    transition: all 0.2s ease; 
-    white-space: nowrap; 
+.toggle-btn:hover {
+    color: #fff;
 }
 
-.tab-btn:hover { 
-    background-color: #3a3a3c; 
-    color: #fff; 
+.toggle-btn.active {
+    background: #1e1e1e;
+    color: #fff;
 }
 
-.tab-btn.active { 
-    background-color: var(--accent); 
-    color: white; 
+/* -------------------------
+   CONTAINER
+--------------------------*/
+
+#articlesContainer {
+    padding: 16px;
 }
 
-#articlesContainer { 
-    display: grid; 
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); 
-    gap: 20px; 
-    width: 100%; max-width: 1300px; 
-    margin-top: 10px; 
+/* -------------------------
+   CARD MODE (DEFAULT)
+--------------------------*/
+
+.card {
+    background: #151515;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 12px;
+    transition: 0.2s;
 }
 
-.card { 
-    background-color: var(--card-bg); 
-    border-radius: 12px; 
-    padding: 16px; 
-    border: 1px solid #2c2c2e; 
-    display: grid; 
-    height: var(--card-height); 
-    grid-template-rows: max-content max-content 1fr; 
-    gap: 12px; 
+.card:hover {
+    transform: translateY(-1px);
 }
 
-.card.uk { border-left: 6px solid var(--uk-color); }
-.card.ak { border-left: 6px solid var(--ak-color); }
-.card.dk { border-left: 6px solid var(--dk-color); }
-
-.card-header { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: flex-start; 
-    gap: 15px; 
-    overflow: hidden; 
-    min-height: 42px; 
+/* Header */
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
 }
 
-.title { 
-    font-size: 16px; 
-    font-weight: 800; 
-    color: var(--text-title); 
-    line-height: 1.3; 
-    margin: 0; 
-    display: 
-    -webkit-box; 
-    -webkit-line-clamp: 2; 
-    -webkit-box-orient: vertical; 
-    overflow: hidden; 
-
+.title {
+    font-size: 16px;
+    font-weight: 600;
 }
 
-.article-num { 
-    font-size: 13px; 
-    font-weight: 700; 
-    color: #e2e2e6; 
-    background-color: #2c2c2e; 
-    padding: 4px 10px; 
-    border-radius: 6px; 
-    border: 1px solid #3a3a3c; 
-    white-space: nowrap; 
+.article-num {
+    color: #aaa;
+    font-size: 13px;
 }
 
-.info-table { 
-    background-color: #262628; 
-    border-radius: 8px; 
-    padding: 10px 12px; 
-    border: 1px solid #3a3a3c; 
-    display: flex; 
-    flex-direction: column; 
-    gap: 6px; 
+/* Info grid */
+.info-table {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 10px;
 }
 
-.info-row { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: flex-start; 
-    gap: 10px; 
-    font-size: 13px; 
-    border-bottom: 1px dashed #3a3a3c; 
-    padding-bottom: 4px; 
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #ccc;
 }
 
-.info-label { 
-    color: #8e8e93; 
-    font-weight: 600; 
-    flex-shrink: 0; 
+.info-label {
+    color: #888;
 }
 
-.info-val { 
-    color: #ffffff; 
-    font-weight: 800; 
-    text-align: right; 
-    max-width: 70%; 
-    word-break: break-word; 
+/* Description */
+.desc {
+    font-size: 13px;
+    color: #bbb;
+    line-height: 1.4;
 }
 
-.info-val.danger { color: var(--uk-color); }
-
-.desc { 
-    font-size: 13px; 
-    line-height: 1.4; 
-    color: var(--text-main); 
-    border-top: 1px solid #252525; 
-    padding-top: 8px; 
-    margin: 0; 
-    overflow-y: auto; 
-}
-
-.loader { 
-    text-align: center; 
-    font-size: 18px; 
-    margin-top: 50px; 
-    grid-column: 1 / -1; 
-}
-
+/* Highlight */
 .highlight {
-    background-color: rgba(255, 215, 0, 0.25);
-    color: #ffd700;
+    background: #2d2d2d;
+    color: #fff;
+    padding: 1px 3px;
     border-radius: 3px;
-    padding: 0 2px;
-    font-weight: bold;
 }
 
-.card-header-right { 
-    display: flex; 
-    align-items: center; 
-    gap: 8px; 
-    flex-shrink: 0; 
+/* Loader */
+.loader {
+    text-align: center;
+    padding: 20px;
+    color: #777;
 }
 
-.article-type { 
-    font-size: 11px; 
-    font-weight: 800; 
-    color: #636366; 
-    background-color: transparent;
-    border: 1px solid #3a3a3c;
-    padding: 3px 6px;
-    border-radius: 4px;
-    white-space: nowrap;
+/* -------------------------
+   CODE COLORS (CARD MODE)
+--------------------------*/
+
+.card.uk { border-left: 4px solid #ff4d4d; }
+.card.ak { border-left: 4px solid #ff9900; }
+.card.dk { border-left: 4px solid #4da3ff; }
+
+/* -------------------------
+   LINE MODE
+--------------------------*/
+
+#line-mode .card {
+    width: 100%;
+    height: 150px;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+/* left section */
+.line-left {
+    flex: 1;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* right section */
+.line-right {
+    width: 240px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-left: 1px solid #2a2a2a;
+    color: #ccc;
+}
+
+/* CODE COLOR STRIPE */
+#line-mode .card.uk {
+    border-left: 4px solid #ff4d4d;
+}
+
+#line-mode .card.ak {
+    border-left: 4px solid #ff9900;
+}
+
+#line-mode .card.dk {
+    border-left: 4px solid #4da3ff;
+}
+
+/* line description */
+.line-desc {
+    display: none;
+    margin-top: 10px;
+    font-size: 13px;
+    color: #bbb;
+    line-height: 1.4;
+}
+
+/* expanded state */
+.line-expanded {
+    height: auto !important;
+    flex-direction: column !important;
+}
+
+.line-expanded .line-desc {
+    display: block;
+}
+
+/* -------------------------
+   SMALL ELEMENTS
+--------------------------*/
+
+.article-type {
+    font-size: 12px;
+    color: #888;
 }
