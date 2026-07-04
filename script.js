@@ -260,10 +260,12 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
             ? `<div class="row-type" title="${escapeHtml(typeLabel)}">${safeType}</div>`
             : '';
 
-        // Левая часть строки: тип (только УК), номер статьи, заголовок
+        // Левая часть строки: сверху — тип (только УК) и номер статьи, ниже — заголовок
         const leftHtml = `
-            ${typeHtml}
-            <div class="row-num">ст. ${highlightedNum}</div>
+            <div class="row-left-top">
+                ${typeHtml}
+                <div class="row-num">ст. ${highlightedNum}</div>
+            </div>
             <div class="row-title">${highlightedTitle}</div>
         `;
 
