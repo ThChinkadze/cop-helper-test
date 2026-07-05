@@ -130,6 +130,28 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+// Подсвечивает совпадения поисковых слов в уже экранированном тексте.
+// Общая логика для карточек и списка — раньше была продублирована в обеих функциях отрисовки.
+function highlightMatches(text, isSearching, searchWords) {
+    if (!isSearching) return text;
+    let result = text;
+    searchWords.forEach(word => {
+        const regex = new RegExp(`(${escapeRegex(word)})`, 'gi');
+        result = result.replace(regex, '<span class="highlight">$1</span>');
+    });
+    return result;
+}
+
+// Строит бейдж типа статьи (F/R и т.п.) с подсказкой-расшифровкой. Показывается только для УК.
+// Общая логика для карточек и списка — раньше была продублирована в обеих функциях отрисовки.
+function buildTypeBadge(article, extraClass = '') {
+    if (article.code !== 'uk') return '';
+    const safeType = escapeHtml(article.type);
+    if (!safeType || safeType === '-') return '';
+    const typeLabel = TYPE_LABELS[article.type] || '';
+    return `<div class="article-type ${extraClass}" title="${escapeHtml(typeLabel)}">${safeType}</div>`;
+}
+
 function renderArticles() {
     const container = document.getElementById('articlesContainer');
     const filterText = document.getElementById('searchInput').value.toLowerCase().trim();
@@ -190,25 +212,12 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
 
         const card = document.createElement('div');
         card.className = `card ${article.code}`;
-        
-        // Подсветка слов (работает поверх уже экранированного текста)
-        const highlightText = (text) => {
-            if (!isSearching) return text;
-            let result = text;
-            searchWords.forEach(word => {
-                const regex = new RegExp(`(${escapeRegex(word)})`, 'gi');
-                result = result.replace(regex, '<span class="highlight">$1</span>');
-            });
-            return result;
-        };
 
-        const highlightedTitle = highlightText(escapeHtml(article.title));
-        const highlightedNum = highlightText(escapeHtml(article.num));
-        const highlightedDesc = highlightText(escapeHtml(article.desc)).replace(/\n/g, '<br>');
+        const highlightedTitle = highlightMatches(escapeHtml(article.title), isSearching, searchWords);
+        const highlightedNum = highlightMatches(escapeHtml(article.num), isSearching, searchWords);
+        const highlightedDesc = highlightMatches(escapeHtml(article.desc), isSearching, searchWords).replace(/\n/g, '<br>');
 
-        const safeType = escapeHtml(article.type);
-        const typeLabel = TYPE_LABELS[article.type] || '';
-        let typeHtml = (article.code === 'uk' && safeType && safeType !== '-') ? `<div class="article-type" title="${escapeHtml(typeLabel)}">${safeType}</div>` : '';
+        const typeHtml = buildTypeBadge(article);
 
         const safeFine = escapeHtml(article.fine);
         const safeStars = escapeHtml(article.stars);
@@ -236,8 +245,7 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
 
 // Отрисовка в виде компактного списка (строк). Логика фильтрации/поиска/сортировки уже
 // выполнена в renderArticles() — эта функция отвечает только за разметку.
-// На этом этапе строка не раскрывается по клику (см. Этап 5) и функция ещё не подключена
-// к тумблеру вида (см. Этап 6) — это отдельные шаги плана.
+// Каждая строка кликабельна: раскрывает/скрывает блок с полным описанием статьи.
 function renderAsList(container, matchedArticles, isSearching, searchWords) {
     matchedArticles.forEach(item => {
         const article = item.article;
@@ -245,26 +253,11 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
         const row = document.createElement('div');
         row.className = `row ${article.code}`;
 
-        // Подсветка слов (та же логика, что и в renderAsCards)
-        const highlightText = (text) => {
-            if (!isSearching) return text;
-            let result = text;
-            searchWords.forEach(word => {
-                const regex = new RegExp(`(${escapeRegex(word)})`, 'gi');
-                result = result.replace(regex, '<span class="highlight">$1</span>');
-            });
-            return result;
-        };
+        const highlightedTitle = highlightMatches(escapeHtml(article.title), isSearching, searchWords);
+        const highlightedNum = highlightMatches(escapeHtml(article.num), isSearching, searchWords);
+        const highlightedDesc = highlightMatches(escapeHtml(article.desc), isSearching, searchWords).replace(/\n/g, '<br>');
 
-        const highlightedTitle = highlightText(escapeHtml(article.title));
-        const highlightedNum = highlightText(escapeHtml(article.num));
-        const highlightedDesc = highlightText(escapeHtml(article.desc)).replace(/\n/g, '<br>');
-
-        const safeType = escapeHtml(article.type);
-        const typeLabel = TYPE_LABELS[article.type] || '';
-        const typeHtml = (article.code === 'uk' && safeType && safeType !== '-')
-            ? `<div class="row-type row-slot-type" title="${escapeHtml(typeLabel)}">${safeType}</div>`
-            : '';
+        const typeHtml = buildTypeBadge(article, 'row-slot-type');
 
         // Левая часть строки: тип (только УК), номер статьи и заголовок.
         // row-slot-type/row-slot-num имеют фиксированную ширину, поэтому заголовок
