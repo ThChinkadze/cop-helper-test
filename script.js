@@ -253,6 +253,7 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
 
         const highlightedTitle = highlightText(escapeHtml(article.title));
         const highlightedNum = highlightText(escapeHtml(article.num));
+        const highlightedDesc = highlightText(escapeHtml(article.desc)).replace(/\n/g, '<br>');
 
         const safeType = escapeHtml(article.type);
         const typeLabel = TYPE_LABELS[article.type] || '';
@@ -297,9 +298,33 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
         }
 
         row.innerHTML = `
-            <div class="row-left">${leftHtml}</div>
-            <div class="row-right">${rightHtml}</div>
+            <div class="row-header" role="button" tabindex="0" aria-expanded="false">
+                <div class="row-left">${leftHtml}</div>
+                <div class="row-right">${rightHtml}</div>
+                <svg class="row-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <div class="row-desc-wrapper">
+                <div class="row-desc-inner">
+                    <div class="row-desc">${highlightedDesc}</div>
+                </div>
+            </div>
         `;
+
+        const header = row.querySelector('.row-header');
+        const toggleExpanded = () => {
+            const willExpand = !row.classList.contains('expanded');
+            row.classList.toggle('expanded', willExpand);
+            header.setAttribute('aria-expanded', String(willExpand));
+        };
+        header.addEventListener('click', toggleExpanded);
+        header.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleExpanded();
+            }
+        });
 
         container.appendChild(row);
     });
