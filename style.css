@@ -356,6 +356,8 @@ body {
     white-space: nowrap;
     cursor: help;
     flex-shrink: 0;
+    box-sizing: border-box;
+    text-align: center;
 }
 
 .row-num {
@@ -368,6 +370,10 @@ body {
     border: 1px solid #3a3a3c;
     white-space: nowrap;
     flex-shrink: 0;
+    box-sizing: border-box;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .row-title {
@@ -396,6 +402,12 @@ body {
     padding: 4px 10px;
     border-radius: 6px;
     white-space: nowrap;
+    box-sizing: border-box;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+    flex-grow: 0;
 }
 
 .row-tag.row-fine {
@@ -407,6 +419,16 @@ body {
     color: var(--uk-color);
     border-color: var(--uk-color);
 }
+
+/* Фиксированные ширины колонок — гарантируют, что параметры всегда стоят
+   в одной и той же горизонтальной позиции, независимо от длины значения. */
+.row-slot-type   { width: 54px; }
+.row-slot-num    { width: 112px; }
+.row-slot-stars  { width: 88px; }
+.row-slot-fine   { width: 168px; }
+.row-slot-arrest { width: 140px; }
+.row-slot-felony { width: 96px; }
+.row-slot-extra  { width: 168px; }
 
 @media (max-width: 480px) {
     .row {
