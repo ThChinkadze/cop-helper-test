@@ -257,17 +257,21 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
         const safeType = escapeHtml(article.type);
         const typeLabel = TYPE_LABELS[article.type] || '';
         const typeHtml = (article.code === 'uk' && safeType && safeType !== '-')
-            ? `<div class="row-type" title="${escapeHtml(typeLabel)}">${safeType}</div>`
+            ? `<div class="row-type row-slot-type" title="${escapeHtml(typeLabel)}">${safeType}</div>`
             : '';
 
-        // Левая часть строки: тип (только УК), номер статьи и заголовок — всё в одну строку
+        // Левая часть строки: тип (только УК), номер статьи и заголовок.
+        // row-slot-type/row-slot-num имеют фиксированную ширину, поэтому заголовок
+        // всегда начинается в одной и той же позиции, независимо от длины тега типа/номера.
         const leftHtml = `
             ${typeHtml}
-            <div class="row-num">ст. ${highlightedNum}</div>
+            <div class="row-num row-slot-num">ст. ${highlightedNum}</div>
             <div class="row-title">${highlightedTitle}</div>
         `;
 
-        // Правая часть строки: для УК — звёзды/штраф/арест/судимость, для АК и ДК — доп. мера/штраф
+        // Правая часть строки: для УК — звёзды/штраф/арест/судимость, для АК и ДК — доп. мера/штраф.
+        // Каждый параметр всегда рендерится (даже без значения — тогда прочерк «—»),
+        // а фиксированная ширина слота (row-slot-*) не даёт колонкам "гулять".
         let rightHtml = '';
         if (article.code === 'uk') {
             const safeStars = escapeHtml(article.stars);
@@ -276,18 +280,18 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
             const hasFelony = article.felony.toLowerCase().includes('судимость');
 
             rightHtml = `
-                ${safeStars ? `<div class="row-tag" title="Розыск">${safeStars}</div>` : ''}
-                ${safeFine ? `<div class="row-tag row-fine" title="Штраф">${safeFine}</div>` : ''}
-                ${safeArrest ? `<div class="row-tag" title="Арест">${safeArrest}</div>` : ''}
-                ${hasFelony ? `<div class="row-tag row-danger" title="Судимость">Судимость</div>` : ''}
+                <div class="row-tag row-slot-stars" title="Розыск">${safeStars || '—'}</div>
+                <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="Штраф">${safeFine || '—'}</div>
+                <div class="row-tag row-slot-arrest" title="Арест">${safeArrest || '—'}</div>
+                <div class="row-tag row-slot-felony ${hasFelony ? 'row-danger' : ''}" title="Судимость">${hasFelony ? 'Судимость' : '—'}</div>
             `;
         } else {
             const safeExtraMeasure = escapeHtml(article.extraMeasure);
             const safeFine = escapeHtml(article.fine);
 
             rightHtml = `
-                ${safeExtraMeasure ? `<div class="row-tag" title="Доп. мера">${safeExtraMeasure}</div>` : ''}
-                ${safeFine ? `<div class="row-tag row-fine" title="Штраф">${safeFine}</div>` : ''}
+                <div class="row-tag row-slot-extra" title="Доп. мера">${safeExtraMeasure || '—'}</div>
+                <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="Штраф">${safeFine || '—'}</div>
             `;
         }
 
