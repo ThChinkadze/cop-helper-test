@@ -260,26 +260,26 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
             ? `<div class="row-type" title="${escapeHtml(typeLabel)}">${safeType}</div>`
             : '';
 
-        // Левая часть строки: сверху — тип (только УК) и номер статьи, ниже — заголовок
+        // Левая часть строки: тип (только УК), номер статьи и заголовок — всё в одну строку
         const leftHtml = `
-            <div class="row-left-top">
-                ${typeHtml}
-                <div class="row-num">ст. ${highlightedNum}</div>
-            </div>
+            ${typeHtml}
+            <div class="row-num">ст. ${highlightedNum}</div>
             <div class="row-title">${highlightedTitle}</div>
         `;
 
-        // Правая часть строки: для УК — звёзды/арест/судимость, для АК и ДК — доп. мера/штраф
+        // Правая часть строки: для УК — звёзды/штраф/арест/судимость, для АК и ДК — доп. мера/штраф
         let rightHtml = '';
         if (article.code === 'uk') {
             const safeStars = escapeHtml(article.stars);
+            const safeFine = escapeHtml(article.fine);
             const safeArrest = escapeHtml(article.arrest);
             const hasFelony = article.felony.toLowerCase().includes('судимость');
 
             rightHtml = `
                 ${safeStars ? `<div class="row-tag" title="Розыск">${safeStars}</div>` : ''}
+                ${safeFine ? `<div class="row-tag row-fine" title="Штраф">${safeFine}</div>` : ''}
                 ${safeArrest ? `<div class="row-tag" title="Арест">${safeArrest}</div>` : ''}
-                <div class="row-felony ${hasFelony ? 'active' : ''}" title="${hasFelony ? 'Есть судимость' : 'Без судимости'}"></div>
+                ${hasFelony ? `<div class="row-tag row-danger" title="Судимость">Судимость</div>` : ''}
             `;
         } else {
             const safeExtraMeasure = escapeHtml(article.extraMeasure);
