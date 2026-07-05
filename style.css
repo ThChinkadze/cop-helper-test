@@ -427,8 +427,13 @@ body {
 .row-slot-stars  { width: 88px; }
 .row-slot-fine   { width: 168px; }
 .row-slot-arrest { width: 140px; }
-.row-slot-felony { width: 96px; }
 .row-slot-extra  { width: 168px; }
+
+/* Скрывает содержимое слота (доп. мера отсутствует), но сохраняет его ширину,
+   чтобы соседние колонки (штраф) не сдвигались */
+.row-hidden {
+    visibility: hidden;
+}
 
 @media (max-width: 480px) {
     .row {
