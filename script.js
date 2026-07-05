@@ -269,28 +269,29 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
             <div class="row-title">${highlightedTitle}</div>
         `;
 
-        // Правая часть строки: для УК — звёзды/штраф/арест/судимость, для АК и ДК — доп. мера/штраф.
-        // Каждый параметр всегда рендерится (даже без значения — тогда прочерк «—»),
-        // а фиксированная ширина слота (row-slot-*) не даёт колонкам "гулять".
+        // Правая часть строки: для УК — звёзды/штраф/арест (арест краснеет при судимости),
+        // для АК и ДК — доп. мера/штраф. Каждый параметр всегда занимает свой слот
+        // фиксированной ширины (row-slot-*), чтобы колонки не "гуляли".
         let rightHtml = '';
         if (article.code === 'uk') {
             const safeStars = escapeHtml(article.stars);
             const safeFine = escapeHtml(article.fine);
             const safeArrest = escapeHtml(article.arrest);
             const hasFelony = article.felony.toLowerCase().includes('судимость');
+            const arrestTitle = hasFelony ? `${escapeHtml(article.arrest)}, судимость` : 'Арест';
 
             rightHtml = `
                 <div class="row-tag row-slot-stars" title="Розыск">${safeStars || '—'}</div>
                 <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="Штраф">${safeFine || '—'}</div>
-                <div class="row-tag row-slot-arrest" title="Арест">${safeArrest || '—'}</div>
-                <div class="row-tag row-slot-felony ${hasFelony ? 'row-danger' : ''}" title="Судимость">${hasFelony ? 'Судимость' : '—'}</div>
+                <div class="row-tag row-slot-arrest ${hasFelony ? 'row-danger' : ''}" title="${arrestTitle}">${safeArrest || '—'}</div>
             `;
         } else {
             const safeExtraMeasure = escapeHtml(article.extraMeasure);
             const safeFine = escapeHtml(article.fine);
+            const hasExtraMeasure = Boolean(article.extraMeasure);
 
             rightHtml = `
-                <div class="row-tag row-slot-extra" title="Доп. мера">${safeExtraMeasure || '—'}</div>
+                <div class="row-tag row-slot-extra ${hasExtraMeasure ? '' : 'row-hidden'}" title="${hasExtraMeasure ? safeExtraMeasure : ''}">${safeExtraMeasure}</div>
                 <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="Штраф">${safeFine || '—'}</div>
             `;
         }
