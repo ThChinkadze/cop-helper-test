@@ -370,9 +370,7 @@ body {
 }
 
 .row-desc {
-    padding: 0 16px 14px 16px;
-    padding-top: 10px;
-    margin-top: 4px;
+    padding: 10px 16px 14px 16px;
     border-top: 1px solid #252525;
     font-size: 13px;
     line-height: 1.5;
