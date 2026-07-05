@@ -268,6 +268,8 @@ body {
     border-radius: 4px;
     white-space: nowrap;
     cursor: help;
+    box-sizing: border-box;
+    text-align: center;
 }
 
 .stale-banner {
@@ -389,21 +391,6 @@ body {
     flex: 1;
 }
 
-.row-type {
-    font-size: 11px;
-    font-weight: 800;
-    color: #636366;
-    background-color: transparent;
-    border: 1px solid #3a3a3c;
-    padding: 3px 6px;
-    border-radius: 4px;
-    white-space: nowrap;
-    cursor: help;
-    flex-shrink: 0;
-    box-sizing: border-box;
-    text-align: center;
-}
-
 .row-num {
     font-size: 13px;
     font-weight: 700;
@@ -466,7 +453,7 @@ body {
 
 /* Фиксированные ширины колонок — гарантируют, что параметры всегда стоят
    в одной и той же горизонтальной позиции, независимо от длины значения. */
-.row-slot-type   { width: 54px; }
+.row-slot-type   { width: 54px; flex-shrink: 0; }
 .row-slot-num    { width: 112px; }
 .row-slot-stars  { width: 88px; }
 .row-slot-fine   { width: 168px; }
