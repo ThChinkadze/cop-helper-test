@@ -168,13 +168,18 @@ function renderArticles() {
     matchedArticles.sort((a, b) => b.matchScore - a.matchScore);
 
     container.innerHTML = "";
+    container.className = currentView === 'list' ? 'list-view' : '';
 
     if (matchedArticles.length === 0) {
         container.innerHTML = `<div class="loader">По запросу ничего не найдено. Попробуйте описать иначе.</div>`;
         return;
     }
 
-    renderAsCards(container, matchedArticles, isSearching, searchWords);
+    if (currentView === 'list') {
+        renderAsList(container, matchedArticles, isSearching, searchWords);
+    } else {
+        renderAsCards(container, matchedArticles, isSearching, searchWords);
+    }
 }
 
 // Отрисовка в виде плиток (карточек). Логика фильтрации/поиска/сортировки уже
@@ -342,6 +347,25 @@ document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click
     }
     renderArticles();
 }));
+
+function syncViewToggleUI() {
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        const isActive = btn.getAttribute('data-view') === currentView;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+}
+
+document.querySelectorAll('.view-btn').forEach(btn => btn.addEventListener('click', (e) => {
+    const selectedView = e.currentTarget.getAttribute('data-view');
+    if (selectedView === currentView) return;
+    currentView = selectedView;
+    localStorage.setItem(VIEW_KEY, currentView);
+    syncViewToggleUI();
+    renderArticles();
+}));
+
+syncViewToggleUI();
 
 document.getElementById('searchInput').addEventListener('input', () => {
     clearTimeout(searchDebounceTimer);
