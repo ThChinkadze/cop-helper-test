@@ -281,8 +281,8 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
             const arrestTitle = hasFelony ? `${escapeHtml(article.arrest)}, судимость` : 'Арест';
 
             rightHtml = `
-                <div class="row-tag row-slot-stars" title="Розыск">${safeStars || '—'}</div>
                 <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="Штраф">${safeFine || '—'}</div>
+                <div class="row-tag row-slot-stars" title="Розыск">${safeStars || '—'}</div>
                 <div class="row-tag row-slot-arrest ${hasFelony ? 'row-danger' : ''}" title="${arrestTitle}">${safeArrest || '—'}</div>
             `;
         } else {
