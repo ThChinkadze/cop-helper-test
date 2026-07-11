@@ -199,46 +199,44 @@ body {
 .zoom-control {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: center;
+    gap: 12px;
 }
 
-#zoomSlider {
-    flex: 1;
-    -webkit-appearance: none;
-    appearance: none;
-    height: 4px;
-    border-radius: 2px;
-    background: #2c2c2e;
-    outline: none;
+.zoom-step-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    background-color: #2c2c2e;
+    color: #ffffff;
+    border: 1px solid #3a3a3c;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1;
     cursor: pointer;
+    transition: all 0.15s ease;
 }
 
-#zoomSlider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--accent);
-    border: none;
-    cursor: pointer;
+.zoom-step-btn:hover:not(:disabled) {
+    background-color: var(--accent);
+    border-color: var(--accent);
 }
 
-#zoomSlider::-moz-range-thumb {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--accent);
-    border: none;
-    cursor: pointer;
+.zoom-step-btn:disabled {
+    color: #4a4a4c;
+    cursor: default;
 }
 
 .zoom-value {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 800;
     color: #ffffff;
-    min-width: 40px;
-    text-align: right;
+    min-width: 48px;
+    text-align: center;
     flex-shrink: 0;
 }
 
