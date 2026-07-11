@@ -9,6 +9,14 @@ let searchDebounceTimer;
 const VIEW_KEY = 'majestic_portland_view_mode';
 let currentView = localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid';
 
+const ZOOM_KEY = 'majestic_portland_zoom_level';
+const ZOOM_MIN = 75;
+const ZOOM_MAX = 150;
+const storedZoom = parseInt(localStorage.getItem(ZOOM_KEY), 10);
+let currentZoom = (Number.isInteger(storedZoom) && storedZoom >= ZOOM_MIN && storedZoom <= ZOOM_MAX)
+    ? storedZoom
+    : 100;
+
 const TYPE_LABELS = {
     'F': 'Федеральная',
     'R': 'Региональная',
@@ -359,6 +367,59 @@ document.querySelectorAll('.view-btn').forEach(btn => btn.addEventListener('clic
 }));
 
 syncViewToggleUI();
+
+// ===== Масштаб страницы =====
+function applyZoom() {
+    document.documentElement.style.zoom = currentZoom + '%';
+}
+
+const zoomSlider = document.getElementById('zoomSlider');
+const zoomValue = document.getElementById('zoomValue');
+
+zoomSlider.value = currentZoom;
+zoomValue.textContent = currentZoom + '%';
+applyZoom();
+
+zoomSlider.addEventListener('input', () => {
+    currentZoom = parseInt(zoomSlider.value, 10);
+    zoomValue.textContent = currentZoom + '%';
+    applyZoom();
+    localStorage.setItem(ZOOM_KEY, String(currentZoom));
+});
+
+// ===== Панель настроек (шестерёнка) =====
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsPanel = document.getElementById('settingsPanel');
+
+function closeSettingsPanel() {
+    settingsPanel.classList.remove('open');
+    settingsBtn.setAttribute('aria-expanded', 'false');
+}
+
+function toggleSettingsPanel() {
+    const willOpen = !settingsPanel.classList.contains('open');
+    settingsPanel.classList.toggle('open', willOpen);
+    settingsBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+}
+
+settingsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleSettingsPanel();
+});
+
+settingsPanel.addEventListener('click', (e) => {
+    e.stopPropagation();
+});
+
+document.addEventListener('click', () => {
+    closeSettingsPanel();
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeSettingsPanel();
+    }
+});
 
 document.getElementById('searchInput').addEventListener('input', () => {
     clearTimeout(searchDebounceTimer);
