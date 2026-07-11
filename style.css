@@ -133,6 +133,115 @@ body {
     color: white;
 }
 
+.settings-wrapper {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.settings-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 100%;
+    padding: 0;
+    background-color: #2c2c2e;
+    color: #8e8e93;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.settings-btn:hover {
+    background-color: #3a3a3c;
+    color: #fff;
+}
+
+.settings-btn[aria-expanded="true"] {
+    background-color: var(--accent);
+    color: white;
+}
+
+.settings-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 240px;
+    max-width: calc(100vw - 40px);
+    box-sizing: border-box;
+    background-color: var(--card-bg);
+    border: 1px solid #2c2c2e;
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    z-index: 150;
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.settings-panel.open {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.settings-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--text-main);
+    margin-bottom: 10px;
+}
+
+.zoom-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#zoomSlider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: #2c2c2e;
+    outline: none;
+    cursor: pointer;
+}
+
+#zoomSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    cursor: pointer;
+}
+
+#zoomSlider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    cursor: pointer;
+}
+
+.zoom-value {
+    font-size: 13px;
+    font-weight: 800;
+    color: #ffffff;
+    min-width: 40px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
 #articlesContainer { 
     display: grid; 
     grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr)); 
