@@ -10,9 +10,13 @@ const VIEW_KEY = 'majestic_portland_view_mode';
 let currentView = localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid';
 
 const ZOOM_KEY = 'majestic_portland_zoom_level';
-const ZOOM_PRESETS = [75, 90, 100, 115, 130, 150];
+const ZOOM_MIN = 75;
+const ZOOM_MAX = 130;
+const ZOOM_STEP = 5;
 const storedZoom = parseInt(localStorage.getItem(ZOOM_KEY), 10);
-let currentZoom = ZOOM_PRESETS.includes(storedZoom) ? storedZoom : 100;
+let currentZoom = (Number.isInteger(storedZoom) && storedZoom >= ZOOM_MIN && storedZoom <= ZOOM_MAX && storedZoom % ZOOM_STEP === 0)
+    ? storedZoom
+    : 100;
 
 const TYPE_LABELS = {
     'F': 'Федеральная',
@@ -376,12 +380,12 @@ const zoomPlusBtn = document.getElementById('zoomPlusBtn');
 
 function updateZoomUI() {
     zoomValue.textContent = currentZoom + '%';
-    const index = ZOOM_PRESETS.indexOf(currentZoom);
-    zoomMinusBtn.disabled = index <= 0;
-    zoomPlusBtn.disabled = index >= ZOOM_PRESETS.length - 1;
+    zoomMinusBtn.disabled = currentZoom <= ZOOM_MIN;
+    zoomPlusBtn.disabled = currentZoom >= ZOOM_MAX;
 }
 
 function setZoom(newZoom) {
+    newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, newZoom));
     if (newZoom === currentZoom) return;
     currentZoom = newZoom;
     applyZoom();
@@ -390,13 +394,11 @@ function setZoom(newZoom) {
 }
 
 zoomMinusBtn.addEventListener('click', () => {
-    const index = ZOOM_PRESETS.indexOf(currentZoom);
-    if (index > 0) setZoom(ZOOM_PRESETS[index - 1]);
+    setZoom(currentZoom - ZOOM_STEP);
 });
 
 zoomPlusBtn.addEventListener('click', () => {
-    const index = ZOOM_PRESETS.indexOf(currentZoom);
-    if (index < ZOOM_PRESETS.length - 1) setZoom(ZOOM_PRESETS[index + 1]);
+    setZoom(currentZoom + ZOOM_STEP);
 });
 
 applyZoom();
