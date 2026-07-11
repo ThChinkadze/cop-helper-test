@@ -10,12 +10,9 @@ const VIEW_KEY = 'majestic_portland_view_mode';
 let currentView = localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid';
 
 const ZOOM_KEY = 'majestic_portland_zoom_level';
-const ZOOM_MIN = 75;
-const ZOOM_MAX = 150;
+const ZOOM_PRESETS = [75, 90, 100, 115, 130, 150];
 const storedZoom = parseInt(localStorage.getItem(ZOOM_KEY), 10);
-let currentZoom = (Number.isInteger(storedZoom) && storedZoom >= ZOOM_MIN && storedZoom <= ZOOM_MAX)
-    ? storedZoom
-    : 100;
+let currentZoom = ZOOM_PRESETS.includes(storedZoom) ? storedZoom : 100;
 
 const TYPE_LABELS = {
     'F': 'Федеральная',
@@ -373,19 +370,37 @@ function applyZoom() {
     document.documentElement.style.zoom = currentZoom + '%';
 }
 
-const zoomSlider = document.getElementById('zoomSlider');
 const zoomValue = document.getElementById('zoomValue');
+const zoomMinusBtn = document.getElementById('zoomMinusBtn');
+const zoomPlusBtn = document.getElementById('zoomPlusBtn');
 
-zoomSlider.value = currentZoom;
-zoomValue.textContent = currentZoom + '%';
-applyZoom();
-
-zoomSlider.addEventListener('input', () => {
-    currentZoom = parseInt(zoomSlider.value, 10);
+function updateZoomUI() {
     zoomValue.textContent = currentZoom + '%';
+    const index = ZOOM_PRESETS.indexOf(currentZoom);
+    zoomMinusBtn.disabled = index <= 0;
+    zoomPlusBtn.disabled = index >= ZOOM_PRESETS.length - 1;
+}
+
+function setZoom(newZoom) {
+    if (newZoom === currentZoom) return;
+    currentZoom = newZoom;
     applyZoom();
+    updateZoomUI();
     localStorage.setItem(ZOOM_KEY, String(currentZoom));
+}
+
+zoomMinusBtn.addEventListener('click', () => {
+    const index = ZOOM_PRESETS.indexOf(currentZoom);
+    if (index > 0) setZoom(ZOOM_PRESETS[index - 1]);
 });
+
+zoomPlusBtn.addEventListener('click', () => {
+    const index = ZOOM_PRESETS.indexOf(currentZoom);
+    if (index < ZOOM_PRESETS.length - 1) setZoom(ZOOM_PRESETS[index + 1]);
+});
+
+applyZoom();
+updateZoomUI();
 
 // ===== Панель настроек (шестерёнка) =====
 const settingsBtn = document.getElementById('settingsBtn');
