@@ -2,7 +2,11 @@ const SHEET_ID = '1ECGNHLbqR8KuPV_QH1E0SO8mGUOm4WIYP-hWWR5PZ-U';
 const SHEET_NAME = encodeURIComponent('База данных'); 
 const TIMEOUT_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}&headers=0`;
 
+const SHEET_NAME_PK = encodeURIComponent('Процессуальный кодекс');
+const PK_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME_PK}&headers=0`;
+
 let parsedDatabase = [];
+let proceduralData = [];
 let currentCode = "uk";
 let searchDebounceTimer;
 
@@ -126,6 +130,41 @@ async function loadData() {
                 });
             }
         }
+    }
+}
+
+// Загрузка данных Процессуального кодекса — отдельный лист, отдельная (упрощённая)
+// структура полей. Сознательно не смешивается с parsedDatabase/loadData, так как
+// у этого раздела совсем другой набор полей (нет штрафа/ареста/звёзд и т.д.).
+// Обработка ошибок/офлайн-кэш для этого раздела — вне рамок текущего этапа,
+// добавим при необходимости позже.
+async function loadProceduralData() {
+    try {
+        const response = await fetch(PK_URL);
+        if (!response.ok) {
+            throw new Error(`Сервер ответил с ошибкой: ${response.status}`);
+        }
+        const text = await response.text();
+        const json = JSON.parse(text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1));
+        const rows = json.table.rows;
+
+        proceduralData = [];
+        rows.forEach((row) => {
+            if (!row.c) return;
+            const cells = row.c;
+            const getVal = (idx) => (cells[idx] && (cells[idx].f || cells[idx].v !== null)) ? String(cells[idx].f || cells[idx].v).trim() : "";
+
+            const title = getVal(0);
+            if (!title || title === "Заголовок") return; // пропускаем пустые строки и строку-заголовок таблицы
+
+            proceduralData.push({
+                title: title,
+                type: getVal(1).toLowerCase(),
+                content: getVal(2)
+            });
+        });
+    } catch (e) {
+        console.error('Не удалось загрузить данные Процессуального кодекса:', e);
     }
 }
 
@@ -443,3 +482,4 @@ document.getElementById('searchInput').addEventListener('input', () => {
     searchDebounceTimer = setTimeout(renderArticles, 150);
 });
 loadData();
+loadProceduralData();
