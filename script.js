@@ -202,6 +202,15 @@ function buildTypeBadge(article, extraClass = '') {
 
 function renderArticles() {
     const container = document.getElementById('articlesContainer');
+
+    // Процессуальный кодекс — отдельный тип контента, без поиска и без плиток/списка.
+    // Рендерится по своей логике, минуя весь пайплайн фильтрации/сортировки статей.
+    if (currentCode === 'pk') {
+        container.className = '';
+        renderProceduralCards(container);
+        return;
+    }
+
     const filterText = document.getElementById('searchInput').value.toLowerCase().trim();
     const isSearching = filterText.length > 0;
 
@@ -373,6 +382,54 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
         });
 
         container.appendChild(row);
+    });
+}
+
+// ===== Процессуальный кодекс: диспетчер шаблонов =====
+// Каждая карточка сама решает, каким шаблоном рендериться (поле "Тип" из таблицы).
+// На этом этапе реализован только "steps" — остальные форматы (list/text/table)
+// осознанно зарезервированы под будущее наполнение и пока используют safe-fallback.
+const PK_TEMPLATES = {
+    steps: renderPkSteps,
+};
+
+function renderPkSteps(content) {
+    const steps = content.split('\n').map(s => s.trim()).filter(Boolean);
+    const items = steps.map(step => `<li>${escapeHtml(step)}</li>`).join('');
+    return `<ol class="pk-steps">${items}</ol>`;
+}
+
+// Safe-fallback: используется и для типов, для которых ещё не написан шаблон
+// (list/text/table), и для опечаток/неизвестных значений в колонке "Тип" —
+// карточка не "теряется" молча, а просто показывается обычным текстом.
+function renderPkFallback(content) {
+    return `<p>${escapeHtml(content).replace(/\n/g, '<br>')}</p>`;
+}
+
+function renderProceduralCardBody(item) {
+    const renderer = PK_TEMPLATES[item.type];
+    return renderer ? renderer(item.content) : renderPkFallback(item.content);
+}
+
+function renderProceduralCards(container) {
+    container.innerHTML = '';
+
+    if (proceduralData.length === 0) {
+        container.innerHTML = `<div class="loader">Раздел пока пуст.</div>`;
+        return;
+    }
+
+    proceduralData.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'card pk';
+
+        card.innerHTML = `
+            <div class="card-header">
+                <div class="title">${escapeHtml(item.title)}</div>
+            </div>
+            <div class="pk-body">${renderProceduralCardBody(item)}</div>
+        `;
+        container.appendChild(card);
     });
 }
 
