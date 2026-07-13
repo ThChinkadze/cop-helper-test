@@ -89,6 +89,17 @@ body {
     border-color: var(--accent); 
 }
 
+#searchInput:disabled {
+    background-color: #202022;
+    color: #5a5a5e;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+#searchInput:disabled::placeholder {
+    color: #5a5a5e;
+}
+
 .tabs { 
     display: flex; 
     gap: 10px; 
