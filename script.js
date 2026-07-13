@@ -376,6 +376,19 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
     });
 }
 
+const DEFAULT_SEARCH_PLACEHOLDER = document.getElementById('searchInput').getAttribute('placeholder');
+const PK_SEARCH_PLACEHOLDER = 'Поиск недоступен в этом разделе';
+
+// Поиск не имеет смысла на вкладке «Процессуальный кодекс» — там нет полей для
+// сопоставления (не статьи, а карточки-темы). Блокируем поле физически, а не
+// просто визуально, чтобы туда нельзя было случайно начать печатать.
+function updateSearchAvailability() {
+    const searchInput = document.getElementById('searchInput');
+    const isPk = currentCode === 'pk';
+    searchInput.disabled = isPk;
+    searchInput.placeholder = isPk ? PK_SEARCH_PLACEHOLDER : DEFAULT_SEARCH_PLACEHOLDER;
+}
+
 document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', (e) => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     e.target.classList.add('active');
@@ -386,6 +399,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click
     if (searchInput.value !== "") {
         searchInput.value = "";
     }
+    updateSearchAvailability();
     renderArticles();
 }));
 
