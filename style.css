@@ -8,6 +8,7 @@
     --uk-color: #ff3b30;
     --ak-color: #ff9500;
     --dk-color: #007aff;
+    --pk-color: #af52de;
     --success: #34c759;
     --card-height: 350px; 
     --scrollbar-thumb: #3a3a3c;
@@ -315,6 +316,36 @@ body {
 .card.uk { border-left: 6px solid var(--uk-color); }
 .card.ak { border-left: 6px solid var(--ak-color); }
 .card.dk { border-left: 6px solid var(--dk-color); }
+
+.card.pk {
+    border-left: 6px solid var(--pk-color);
+    grid-template-rows: max-content 1fr;
+}
+
+.pk-body {
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-main);
+    border-top: 1px solid #252525;
+    padding-top: 8px;
+}
+
+.pk-body p {
+    margin: 0;
+}
+
+.pk-steps {
+    margin: 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pk-steps li {
+    padding-left: 2px;
+}
 
 .card-header { 
     display: flex; 
