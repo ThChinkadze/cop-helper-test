@@ -322,13 +322,22 @@ body {
     grid-template-rows: max-content 1fr;
 }
 
+.card.pk .card-header {
+    min-height: 0;
+}
+
+.card.pk .title {
+    font-size: 19px;
+    -webkit-line-clamp: 3;
+}
+
 .pk-body {
     overflow-y: auto;
-    font-size: 13px;
-    line-height: 1.5;
-    color: var(--text-main);
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: #c4c4c9;
     border-top: 1px solid #252525;
-    padding-top: 8px;
+    padding-top: 12px;
 }
 
 .pk-body p {
@@ -336,15 +345,36 @@ body {
 }
 
 .pk-steps {
+    list-style: none;
+    counter-reset: pk-step;
     margin: 0;
-    padding-left: 20px;
+    padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
 }
 
 .pk-steps li {
-    padding-left: 2px;
+    counter-increment: pk-step;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.pk-steps li::before {
+    content: counter(pk-step);
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+    border-radius: 50%;
+    background-color: rgba(175, 82, 222, 0.16);
+    color: var(--pk-color);
+    font-size: 11px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .card-header { 
