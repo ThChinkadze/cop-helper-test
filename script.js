@@ -140,7 +140,7 @@ async function loadData() {
             container.innerHTML = `
                 <div class="loader">
                     Не удалось загрузить базу данных. Проверьте интернет-соединение и попробуйте снова.<br>
-                    <button id="retryLoadBtn" class="tab-btn" style="margin-top: 12px; flex: none; padding: 10px 20px;">Повторить попытку</button>
+                    <button id="retryLoadBtn" class="tab-btn retry-btn">Повторить попытку</button>
                 </div>
             `;
             const retryBtn = document.getElementById('retryLoadBtn');
@@ -279,6 +279,25 @@ function renderArticles() {
     }
 }
 
+// Определяет, есть ли у статьи признак судимости по тексту поля "felony".
+// Общая логика для карточек и списка — раньше проверка была продублирована:
+// один раз инлайн прямо в шаблонной строке карточки, второй раз отдельной
+// переменной в списке — с риском разойтись при будущей правке критерия.
+function hasFelonyRecord(article) {
+    return article.felony.toLowerCase().includes('судимость');
+}
+
+// Готовит подсвеченные (уже экранированные) поля статьи — заголовок, номер,
+// описание. Общая логика для карточек и списка: раньше этот блок был дословно
+// продублирован в начале renderAsCards и renderAsList.
+function buildHighlightedFields(article, isSearching, searchWords) {
+    return {
+        title: highlightMatches(escapeHtml(article.title), isSearching, searchWords),
+        num: highlightMatches(escapeHtml(article.num), isSearching, searchWords),
+        desc: highlightMatches(escapeHtml(article.desc), isSearching, searchWords).replace(/\n/g, '<br>'),
+    };
+}
+
 // Отрисовка в виде плиток (карточек). Логика фильтрации/поиска/сортировки уже
 // выполнена в renderArticles() — эта функция отвечает только за разметку.
 function renderAsCards(container, matchedArticles, isSearching, searchWords) {
@@ -288,9 +307,8 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
         const card = document.createElement('div');
         card.className = `card ${article.code}`;
 
-        const highlightedTitle = highlightMatches(escapeHtml(article.title), isSearching, searchWords);
-        const highlightedNum = highlightMatches(escapeHtml(article.num), isSearching, searchWords);
-        const highlightedDesc = highlightMatches(escapeHtml(article.desc), isSearching, searchWords).replace(/\n/g, '<br>');
+        const { title: highlightedTitle, num: highlightedNum, desc: highlightedDesc } =
+            buildHighlightedFields(article, isSearching, searchWords);
 
         const typeHtml = buildTypeBadge(article);
 
@@ -309,7 +327,7 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
                 <div class="info-row"><div class="info-label">Штраф</div><div class="info-val">${safeFine || '—'}</div></div>
                 <div class="info-row"><div class="info-label">Розыск</div><div class="info-val">${safeStars || '—'}</div></div>
                 <div class="info-row"><div class="info-label">Арест</div><div class="info-val">${safeArrest || '—'}</div></div>
-                <div class="info-row"><div class="info-label">Судимость</div><div class="info-val ${article.felony.toLowerCase().includes('судимость') ? 'danger' : ''}">${safeFelony || '—'}</div></div>
+                <div class="info-row"><div class="info-label">Судимость</div><div class="info-val ${hasFelonyRecord(article) ? 'danger' : ''}">${safeFelony || '—'}</div></div>
                 <div class="info-row"><div class="info-label">Доп. мера</div><div class="info-val">${safeExtraMeasure || '—'}</div></div>
             </div>
             <div class="desc">${highlightedDesc}</div>
@@ -328,9 +346,8 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
         const row = document.createElement('div');
         row.className = `row ${article.code}`;
 
-        const highlightedTitle = highlightMatches(escapeHtml(article.title), isSearching, searchWords);
-        const highlightedNum = highlightMatches(escapeHtml(article.num), isSearching, searchWords);
-        const highlightedDesc = highlightMatches(escapeHtml(article.desc), isSearching, searchWords).replace(/\n/g, '<br>');
+        const { title: highlightedTitle, num: highlightedNum, desc: highlightedDesc } =
+            buildHighlightedFields(article, isSearching, searchWords);
 
         const typeHtml = buildTypeBadge(article, 'row-slot-type');
 
@@ -351,7 +368,7 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
             const safeStars = escapeHtml(article.stars);
             const safeFine = escapeHtml(article.fine);
             const safeArrest = escapeHtml(article.arrest);
-            const hasFelony = article.felony.toLowerCase().includes('судимость');
+            const hasFelony = hasFelonyRecord(article);
             const arrestTitle = hasFelony ? `${escapeHtml(article.arrest)}, судимость` : 'Арест';
 
             rightHtml = `
