@@ -78,6 +78,28 @@ body {
     .tabs::-webkit-scrollbar {
         display: none;
     }
+
+    /* Компактный вид (список строк) на узких экранах — переносим строку
+       вместо горизонтального сжатия колонок */
+    .row-header {
+        flex-wrap: wrap;
+    }
+
+    .row-left {
+        width: 100%;
+    }
+
+    .row-title {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+    }
+
+    .row-right {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
 }
 
 .controls-container { 
@@ -92,7 +114,7 @@ body {
     font-size: 18px; 
     font-family: 'Nunito', sans-serif; 
     background-color: var(--control-bg); 
-    color: white; 
+    color: var(--text-title); 
     border: 2px solid transparent; 
     border-radius: 10px; 
     outline: none; 
@@ -137,7 +159,15 @@ body {
 
 .tab-btn.active { 
     background-color: var(--accent); 
-    color: white; 
+    color: var(--text-title); 
+}
+
+/* Модификатор для кнопки повтора загрузки в .loader — раньше эти три свойства
+   были заданы инлайн-стилем прямо в script.js, единственное такое место в проекте */
+.retry-btn {
+    margin-top: 12px;
+    flex: none;
+    padding: 10px 20px;
 }
 
 .controls-row {
@@ -183,7 +213,7 @@ body {
 
 .view-btn.active {
     background-color: var(--accent);
-    color: white;
+    color: var(--text-title);
 }
 
 .settings-wrapper {
@@ -214,7 +244,7 @@ body {
 
 .settings-btn[aria-expanded="true"] {
     background-color: var(--accent);
-    color: white;
+    color: var(--text-title);
 }
 
 .settings-panel {
@@ -265,7 +295,7 @@ body {
     height: 32px;
     flex-shrink: 0;
     background-color: var(--control-bg);
-    color: #ffffff;
+    color: var(--text-title);
     border: 1px solid var(--control-border);
     border-radius: 8px;
     font-size: 18px;
@@ -288,7 +318,7 @@ body {
 .zoom-value {
     font-size: 14px;
     font-weight: 800;
-    color: #ffffff;
+    color: var(--text-title);
     min-width: 48px;
     text-align: center;
     flex-shrink: 0;
@@ -468,7 +498,7 @@ body {
 }
 
 .info-val { 
-    color: #ffffff; 
+    color: var(--text-title); 
     font-weight: 800; 
     text-align: right; 
     max-width: 70%; 
@@ -670,7 +700,7 @@ body {
 .row-tag {
     font-size: 13px;
     font-weight: 700;
-    color: #ffffff;
+    color: var(--text-title);
     background-color: #262628;
     border: 1px solid var(--control-border);
     padding: 4px 10px;
@@ -707,26 +737,4 @@ body {
    чтобы соседние колонки (штраф) не сдвигались */
 .row-hidden {
     visibility: hidden;
-}
-
-@media (max-width: 480px) {
-    .row-header {
-        flex-wrap: wrap;
-    }
-
-    .row-left {
-        width: 100%;
-    }
-
-    .row-title {
-        white-space: normal;
-        overflow: visible;
-        text-overflow: unset;
-    }
-
-    .row-right {
-        width: 100%;
-        justify-content: flex-start;
-        flex-wrap: wrap;
-    }
 }
