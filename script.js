@@ -387,10 +387,10 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
 
 // ===== Процессуальный кодекс: диспетчер шаблонов =====
 // Каждая карточка сама решает, каким шаблоном рендериться (поле "Тип" из таблицы).
-// На этом этапе реализован только "steps" — остальные форматы (list/text/table)
-// осознанно зарезервированы под будущее наполнение и пока используют safe-fallback.
+// "text" и "table" пока не реализованы — не встречались в реальном контенте, добавим по необходимости.
 const PK_TEMPLATES = {
     steps: renderPkSteps,
+    list: renderPkList,
 };
 
 function renderPkSteps(content) {
@@ -399,8 +399,15 @@ function renderPkSteps(content) {
     return `<ol class="pk-steps">${items}</ol>`;
 }
 
+// Маркированный список — порядок пунктов не важен (в отличие от "steps")
+function renderPkList(content) {
+    const points = content.split('\n').map(s => s.trim()).filter(Boolean);
+    const items = points.map(point => `<li>${escapeHtml(point)}</li>`).join('');
+    return `<ul class="pk-list">${items}</ul>`;
+}
+
 // Safe-fallback: используется и для типов, для которых ещё не написан шаблон
-// (list/text/table), и для опечаток/неизвестных значений в колонке "Тип" —
+// (сейчас это "text"), и для опечаток/неизвестных значений в колонке "Тип" —
 // карточка не "теряется" молча, а просто показывается обычным текстом.
 function renderPkFallback(content) {
     return `<p>${escapeHtml(content).replace(/\n/g, '<br>')}</p>`;
