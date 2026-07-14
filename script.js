@@ -203,16 +203,19 @@ function buildTypeBadge(article, extraClass = '') {
 function renderArticles() {
     const container = document.getElementById('articlesContainer');
 
-    // Процессуальный кодекс — отдельный тип контента, без поиска и без плиток/списка.
-    // Рендерится по своей логике, минуя весь пайплайн фильтрации/сортировки статей.
-    if (currentCode === 'pk') {
+    const filterText = document.getElementById('searchInput').value.toLowerCase().trim();
+    const isSearching = filterText.length > 0;
+
+    // Процессуальный кодекс — отдельный тип контента, без плиток/списка и своей
+    // логикой рендера. Но пока идёт поиск (в том числе начатый на этой вкладке),
+    // показываем не карточки ПК, а обычные результаты по УК/АК/ДК — так же, как
+    // при поиске с любой другой вкладки. proceduralData в эту выдачу не попадает,
+    // так как поиск ниже работает только по parsedDatabase.
+    if (currentCode === 'pk' && !isSearching) {
         container.className = '';
         renderProceduralCards(container);
         return;
     }
-
-    const filterText = document.getElementById('searchInput').value.toLowerCase().trim();
-    const isSearching = filterText.length > 0;
 
     let searchWords = [];
     if (isSearching) {
@@ -440,19 +443,6 @@ function renderProceduralCards(container) {
     });
 }
 
-const DEFAULT_SEARCH_PLACEHOLDER = document.getElementById('searchInput').getAttribute('placeholder');
-const PK_SEARCH_PLACEHOLDER = 'Поиск недоступен в этом разделе';
-
-// Поиск не имеет смысла на вкладке «Процессуальный кодекс» — там нет полей для
-// сопоставления (не статьи, а карточки-темы). Блокируем поле физически, а не
-// просто визуально, чтобы туда нельзя было случайно начать печатать.
-function updateSearchAvailability() {
-    const searchInput = document.getElementById('searchInput');
-    const isPk = currentCode === 'pk';
-    searchInput.disabled = isPk;
-    searchInput.placeholder = isPk ? PK_SEARCH_PLACEHOLDER : DEFAULT_SEARCH_PLACEHOLDER;
-}
-
 document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', (e) => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     e.target.classList.add('active');
@@ -463,7 +453,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click
     if (searchInput.value !== "") {
         searchInput.value = "";
     }
-    updateSearchAvailability();
     renderArticles();
 }));
 
