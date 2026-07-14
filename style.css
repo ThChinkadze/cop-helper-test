@@ -335,6 +335,19 @@ body {
     color: #c4c4c9;
     border-top: 1px solid #252525;
     padding-top: 12px;
+    scrollbar-width: none;
+    /* См. подробное объяснение приёма в .desc — то же затухание вместо скроллбара. */
+    background-image:
+        linear-gradient(to bottom, rgba(0, 0, 0, 0), var(--card-bg) 85%),
+        radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0));
+    background-repeat: no-repeat, no-repeat;
+    background-position: center bottom, center bottom;
+    background-size: 100% 36px, 100% 14px;
+    background-attachment: local, scroll;
+}
+
+.pk-body::-webkit-scrollbar {
+    display: none;
 }
 
 .pk-body p {
@@ -479,6 +492,23 @@ body {
     padding-top: 8px; 
     margin: 0; 
     overflow-y: auto; 
+    scrollbar-width: none;
+    /* Вместо полосы скроллбара — градиентное затухание снизу, сигнализирующее,
+       что текст можно прокрутить дальше. "cover" (нижний слой) закреплён за
+       СОДЕРЖИМЫМ (attachment: local) и всегда лежит у истинного конца текста,
+       поэтому при докрутке до конца он перекрывает "shadow" (attachment: scroll,
+       всегда у нижнего края видимой области) — тень гаснет сама, без JS. */
+    background-image:
+        linear-gradient(to bottom, rgba(0, 0, 0, 0), var(--card-bg) 85%),
+        radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0));
+    background-repeat: no-repeat, no-repeat;
+    background-position: center bottom, center bottom;
+    background-size: 100% 36px, 100% 14px;
+    background-attachment: local, scroll;
+}
+
+.desc::-webkit-scrollbar {
+    display: none;
 }
 
 .loader { 
