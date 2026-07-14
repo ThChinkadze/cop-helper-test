@@ -61,6 +61,20 @@ body {
     body {
         padding: 10px;
     }
+
+    /* Горизонтальный скролл вкладок нужен только на узких экранах —
+       на десктопе ширины шапки достаточно и без него (см. .tabs).
+       overflow-x:auto здесь неизбежно обрезает вертикальную часть теней
+       кнопок вкладок (спецификация CSS переводит overflow-y тоже в auto),
+       но на мобильном это меньшее зло по сравнению с нечитаемым рядом вкладок. */
+    .tabs {
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .tabs::-webkit-scrollbar {
+        display: none;
+    }
 }
 
 .controls-container { 
@@ -94,16 +108,7 @@ body {
     display: flex; 
     gap: 10px; 
     width: 100%; 
-    overflow-x: auto; 
     padding-bottom: 5px; 
-    /* Прокрутка остаётся рабочей (актуально на узких экранах, где даже
-       расширенной шапки может не хватить), но полоса визуально не видна —
-       на десктопе она и так не появляется благодаря увеличенной ширине шапки */
-    scrollbar-width: none;
-}
-
-.tabs::-webkit-scrollbar {
-    display: none;
 }
 
 .tab-btn { 
