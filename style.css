@@ -13,6 +13,9 @@
     --card-height: 350px; 
     --scrollbar-thumb: #3a3a3c;
     --scrollbar-thumb-hover: #4a4a4c;
+    --control-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    --control-bg: #2c2c2e;
+    --control-border: #3a3a3c;
 }
 
 /* Тонкий скроллбар в цвет темы — применяется ко всей странице
@@ -88,12 +91,12 @@ body {
     padding: 16px 20px; 
     font-size: 18px; 
     font-family: 'Nunito', sans-serif; 
-    background-color: #2c2c2e; 
+    background-color: var(--control-bg); 
     color: white; 
     border: 2px solid transparent; 
     border-radius: 10px; 
     outline: none; 
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4); 
+    box-shadow: var(--control-shadow); 
     transition: border-color 0.2s; 
     box-sizing: border-box; 
     margin-bottom: 15px; 
@@ -117,18 +120,18 @@ body {
     font-family: 'Nunito', sans-serif; 
     font-size: 15px; 
     font-weight: 800; 
-    background-color: #2c2c2e; 
+    background-color: var(--control-bg); 
     color: #8e8e93; 
     border: none; 
     border-radius: 8px; 
     cursor: pointer; 
     transition: all 0.2s ease; 
     white-space: nowrap; 
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4); 
+    box-shadow: var(--control-shadow); 
 }
 
 .tab-btn:hover { 
-    background-color: #3a3a3c; 
+    background-color: var(--control-border); 
     color: #fff; 
 }
 
@@ -153,10 +156,10 @@ body {
     display: flex;
     flex-shrink: 0;
     gap: 4px;
-    background-color: #2c2c2e;
+    background-color: var(--control-bg);
     border-radius: 8px;
     padding: 4px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    box-shadow: var(--control-shadow);
 }
 
 .view-btn {
@@ -174,7 +177,7 @@ body {
 }
 
 .view-btn:hover {
-    background-color: #3a3a3c;
+    background-color: var(--control-border);
     color: #fff;
 }
 
@@ -195,17 +198,17 @@ body {
     width: 40px;
     height: 100%;
     padding: 0;
-    background-color: #2c2c2e;
+    background-color: var(--control-bg);
     color: #8e8e93;
     border: none;
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    box-shadow: var(--control-shadow);
 }
 
 .settings-btn:hover {
-    background-color: #3a3a3c;
+    background-color: var(--control-border);
     color: #fff;
 }
 
@@ -222,7 +225,7 @@ body {
     max-width: calc(100vw - 40px);
     box-sizing: border-box;
     background-color: var(--card-bg);
-    border: 1px solid #2c2c2e;
+    border: 1px solid var(--control-bg);
     border-radius: 10px;
     padding: 16px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -261,9 +264,9 @@ body {
     width: 32px;
     height: 32px;
     flex-shrink: 0;
-    background-color: #2c2c2e;
+    background-color: var(--control-bg);
     color: #ffffff;
-    border: 1px solid #3a3a3c;
+    border: 1px solid var(--control-border);
     border-radius: 8px;
     font-size: 18px;
     font-weight: 800;
@@ -303,7 +306,7 @@ body {
     background-color: var(--card-bg); 
     border-radius: 12px; 
     padding: 16px; 
-    border: 1px solid #2c2c2e; 
+    border: 1px solid var(--control-bg); 
     display: grid; 
     height: var(--card-height); 
     grid-template-rows: max-content max-content 1fr; 
@@ -424,14 +427,17 @@ body {
 
 }
 
-.article-num { 
+/* Общий базовый бейдж для номера статьи — переиспользуется в карточках (сам по
+   себе) и в списке (.row-num добавляет только особенности слота фиксированной
+   ширины поверх этой базы) */
+.badge-num { 
     font-size: 13px; 
     font-weight: 700; 
     color: #e2e2e6; 
-    background-color: #2c2c2e; 
+    background-color: var(--control-bg); 
     padding: 4px 10px; 
     border-radius: 6px; 
-    border: 1px solid #3a3a3c; 
+    border: 1px solid var(--control-border); 
     white-space: nowrap; 
 }
 
@@ -439,7 +445,7 @@ body {
     background-color: #262628; 
     border-radius: 8px; 
     padding: 10px 12px; 
-    border: 1px solid #3a3a3c; 
+    border: 1px solid var(--control-border); 
     display: flex; 
     flex-direction: column; 
     gap: 6px; 
@@ -451,7 +457,7 @@ body {
     align-items: flex-start; 
     gap: 10px; 
     font-size: 13px; 
-    border-bottom: 1px dashed #3a3a3c; 
+    border-bottom: 1px dashed var(--control-border); 
     padding-bottom: 4px; 
 }
 
@@ -490,7 +496,7 @@ body {
 
 .highlight {
     background-color: rgba(255, 215, 0, 0.25);
-    color: #ffd700;
+    color: var(--stars);
     border-radius: 3px;
     padding: 0 2px;
     font-weight: bold;
@@ -508,7 +514,7 @@ body {
     font-weight: 800; 
     color: #636366; 
     background-color: transparent;
-    border: 1px solid #3a3a3c;
+    border: 1px solid var(--control-border);
     padding: 3px 6px;
     border-radius: 4px;
     white-space: nowrap;
@@ -564,7 +570,7 @@ body {
 .row {
     background-color: var(--card-bg);
     border-radius: 10px;
-    border: 1px solid #2c2c2e;
+    border: 1px solid var(--control-bg);
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -587,7 +593,7 @@ body {
 }
 
 .row:hover {
-    border-color: #3a3a3c;
+    border-color: var(--control-border);
 }
 
 .row.uk { border-left: 6px solid var(--uk-color); }
@@ -637,14 +643,6 @@ body {
 }
 
 .row-num {
-    font-size: 13px;
-    font-weight: 700;
-    color: #e2e2e6;
-    background-color: #2c2c2e;
-    padding: 4px 10px;
-    border-radius: 6px;
-    border: 1px solid #3a3a3c;
-    white-space: nowrap;
     flex-shrink: 0;
     box-sizing: border-box;
     text-align: center;
@@ -674,7 +672,7 @@ body {
     font-weight: 700;
     color: #ffffff;
     background-color: #262628;
-    border: 1px solid #3a3a3c;
+    border: 1px solid var(--control-border);
     padding: 4px 10px;
     border-radius: 6px;
     white-space: nowrap;
