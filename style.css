@@ -377,6 +377,33 @@ body {
     justify-content: center;
 }
 
+/* Маркированный список (тип "list") — та же плотность/ритм, что и у "steps",
+   но маркер — простая точка, без нумерации (порядок пунктов не важен) */
+.pk-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pk-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.pk-list li::before {
+    content: '';
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    margin-top: 8px;
+    border-radius: 50%;
+    background-color: var(--pk-color);
+}
+
 .card-header { 
     display: flex; 
     justify-content: space-between; 
