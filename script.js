@@ -71,22 +71,43 @@ function showStaleBanner(savedAt) {
     document.getElementById('retryStaleBtn').addEventListener('click', loadData);
 }
 
+// Общий запрос+разбор gviz-ответа Google Sheets — используется обоими загрузчиками
+// (статьи кодексов и Процессуальный кодекс). Обработка ошибок и раскладка строк по
+// полям намеренно остаются в каждом загрузчике отдельно (у loadData есть офлайн-кэш
+// и баннер, у loadProceduralData — нет), сюда вынесена только общая часть
+// "получить ответ и распарсить его в массив строк".
+async function fetchGvizRows(url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Сервер ответил с ошибкой: ${response.status}`);
+    }
+    const text = await response.text();
+    const json = JSON.parse(text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1));
+    return json.table.rows;
+}
+
+// Достаёт значение ячейки gviz-таблицы по индексу: приоритет — форматированное
+// значение (f), затем сырое (v), иначе пустая строка. Общая для обоих листов
+// (статьи и ПК). Написано явными шагами вместо свёрнутого тернарника — так проще
+// увидеть порядок приоритета f -> v -> "" и не перепутать его при будущих правках.
+function getCellVal(cells, idx) {
+    const cell = cells[idx];
+    if (!cell) return "";
+    if (cell.f) return String(cell.f).trim();
+    if (cell.v !== null) return String(cell.v).trim();
+    return "";
+}
+
 async function loadData() {
     const container = document.getElementById('articlesContainer');
     try {
-        const response = await fetch(TIMEOUT_URL);
-        if (!response.ok) {
-            throw new Error(`Сервер ответил с ошибкой: ${response.status}`);
-        }
-        const text = await response.text();
-        const json = JSON.parse(text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1));
-        const rows = json.table.rows;
+        const rows = await fetchGvizRows(TIMEOUT_URL);
 
         parsedDatabase = [];
         rows.forEach((row) => {
             if (!row.c) return;
             const cells = row.c;
-            const getVal = (idx) => (cells[idx] && (cells[idx].f || cells[idx].v !== null)) ? String(cells[idx].f || cells[idx].v).trim() : "";
+            const getVal = (idx) => getCellVal(cells, idx);
 
             let rawCode = getVal(0).toUpperCase();
             if (rawCode === "КОДЕКС" || !{'UK':'uk','AK':'ak','DK':'dk'}[rawCode]) return;
@@ -140,19 +161,13 @@ async function loadData() {
 // добавим при необходимости позже.
 async function loadProceduralData() {
     try {
-        const response = await fetch(PK_URL);
-        if (!response.ok) {
-            throw new Error(`Сервер ответил с ошибкой: ${response.status}`);
-        }
-        const text = await response.text();
-        const json = JSON.parse(text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1));
-        const rows = json.table.rows;
+        const rows = await fetchGvizRows(PK_URL);
 
         proceduralData = [];
         rows.forEach((row) => {
             if (!row.c) return;
             const cells = row.c;
-            const getVal = (idx) => (cells[idx] && (cells[idx].f || cells[idx].v !== null)) ? String(cells[idx].f || cells[idx].v).trim() : "";
+            const getVal = (idx) => getCellVal(cells, idx);
 
             const title = getVal(0);
             if (!title || title === "Заголовок") return; // пропускаем пустые строки и строку-заголовок таблицы
@@ -288,7 +303,7 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
         card.innerHTML = `
             <div class="card-header">
                 <div class="title">${highlightedTitle}</div>
-                <div class="card-header-right">${typeHtml}<div class="article-num">ст. ${highlightedNum}</div></div>
+                <div class="card-header-right">${typeHtml}<div class="badge-num">ст. ${highlightedNum}</div></div>
             </div>
             <div class="info-table">
                 <div class="info-row"><div class="info-label">Штраф</div><div class="info-val">${safeFine || '—'}</div></div>
@@ -324,7 +339,7 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
         // всегда начинается в одной и той же позиции, независимо от длины тега типа/номера.
         const leftHtml = `
             ${typeHtml}
-            <div class="row-num row-slot-num">ст. ${highlightedNum}</div>
+            <div class="badge-num row-num row-slot-num">ст. ${highlightedNum}</div>
             <div class="row-title">${highlightedTitle}</div>
         `;
 
