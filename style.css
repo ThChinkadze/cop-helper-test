@@ -67,8 +67,6 @@ body {
     width: 100%; max-width: 1100px; 
     position: sticky; top: 0; z-index: 100; 
     padding-top: 10px; padding-bottom: 20px; 
-    background-color: var(--bg-color);
-    box-shadow: 0 10px 20px -6px rgba(0, 0, 0, 0.6);
 }
 
 #searchInput { 
@@ -121,6 +119,7 @@ body {
     cursor: pointer; 
     transition: all 0.2s ease; 
     white-space: nowrap; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4); 
 }
 
 .tab-btn:hover { 
@@ -152,6 +151,7 @@ body {
     background-color: #2c2c2e;
     border-radius: 8px;
     padding: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 
 .view-btn {
@@ -196,6 +196,7 @@ body {
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 
 .settings-btn:hover {
