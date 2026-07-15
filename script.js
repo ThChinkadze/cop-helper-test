@@ -13,6 +13,11 @@ let searchDebounceTimer;
 const VIEW_KEY = 'majestic_portland_view_mode';
 let currentView = localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid';
 
+// Режим отображения по частоте статей: 'compact' (только частые) — дефолт,
+// или 'full' (все статьи). Общий для УК/АК/ДК, не зависит от currentCode.
+const DISPLAY_MODE_KEY = 'majestic_portland_display_mode';
+let currentDisplayMode = localStorage.getItem(DISPLAY_MODE_KEY) === 'full' ? 'full' : 'compact';
+
 const ZOOM_KEY = 'majestic_portland_zoom_level';
 const ZOOM_MIN = 75;
 const ZOOM_MAX = 130;
@@ -98,6 +103,14 @@ function getCellVal(cells, idx) {
     return "";
 }
 
+// Нормализует значение колонки "Частота" к двум состояниям: 'frequent' | 'rare'.
+// Любое значение, кроме точного "частая" (без учёта регистра и лишних пробелов),
+// считается редкой статьёй — так пустые/ещё неразмеченные строки не попадают
+// по умолчанию в компактный режим отображения.
+function normalizeFrequency(raw) {
+    return raw.trim().toLowerCase() === 'частая' ? 'frequent' : 'rare';
+}
+
 async function loadData() {
     const container = document.getElementById('articlesContainer');
     try {
@@ -123,7 +136,8 @@ async function loadData() {
                 arrest: getVal(7),
                 felony: getVal(8),
                 type: getVal(9),   
-                tags: getVal(10)   
+                tags: getVal(10),
+                frequency: normalizeFrequency(getVal(11))
             });
         });
         saveCache(parsedDatabase);
@@ -241,6 +255,7 @@ function renderArticles() {
 
     parsedDatabase.forEach(article => {
         if (!isSearching && article.code !== currentCode) return;
+        if (!isSearching && currentDisplayMode === 'compact' && article.frequency === 'rare') return;
 
         let matchScore = 0;
 
@@ -487,6 +502,25 @@ document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click
     }
     renderArticles();
 }));
+
+function syncModeToggleUI() {
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        const isActive = btn.getAttribute('data-mode') === currentDisplayMode;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+}
+
+document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', (e) => {
+    const selectedMode = e.currentTarget.getAttribute('data-mode');
+    if (selectedMode === currentDisplayMode) return;
+    currentDisplayMode = selectedMode;
+    localStorage.setItem(DISPLAY_MODE_KEY, currentDisplayMode);
+    syncModeToggleUI();
+    renderArticles();
+}));
+
+syncModeToggleUI();
 
 function syncViewToggleUI() {
     document.querySelectorAll('.view-btn').forEach(btn => {
