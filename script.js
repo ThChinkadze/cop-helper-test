@@ -27,6 +27,12 @@ let currentZoom = (Number.isInteger(storedZoom) && storedZoom >= ZOOM_MIN && sto
     ? storedZoom
     : 100;
 
+const CODE_LABELS = {
+    'uk': 'УК',
+    'ak': 'АК',
+    'dk': 'ДК'
+};
+
 const TYPE_LABELS = {
     'Ф': 'Федеральная',
     'Р': 'Региональная',
@@ -230,6 +236,42 @@ function buildTypeBadge(article, extraClass = '') {
     return `<div class="article-type ${extraClass}" title="${escapeHtml(typeLabel)}">${safeType}</div>`;
 }
 
+// Показывает короткое всплывающее уведомление внизу экрана. Переиспользует один
+// и тот же DOM-элемент между вызовами, чтобы повторное копирование корректно
+// перезапускало анимацию, а не плодило уведомления одно поверх другого.
+let toastEl = null;
+let toastHideTimer = null;
+function showToast(message) {
+    if (!toastEl) {
+        toastEl = document.createElement('div');
+        toastEl.className = 'toast';
+        document.body.appendChild(toastEl);
+    }
+    toastEl.textContent = message;
+
+    clearTimeout(toastHideTimer);
+    toastEl.classList.remove('toast-visible');
+    // Форсируем reflow, чтобы сброс и повторное добавление класса гарантированно
+    // перезапускали CSS-переход при быстром повторном клике.
+    void toastEl.offsetWidth;
+    toastEl.classList.add('toast-visible');
+
+    toastHideTimer = setTimeout(() => {
+        toastEl.classList.remove('toast-visible');
+    }, 1800);
+}
+
+// Копирует номер статьи в формате "ст. <номер> <УК/АК/ДК>" в буфер обмена
+// и показывает уведомление об успехе.
+function copyArticleNumber(article) {
+    const codeLabel = CODE_LABELS[article.code] || '';
+    const text = `ст. ${article.num} ${codeLabel}`.trim();
+
+    navigator.clipboard.writeText(text)
+        .then(() => showToast('Скопировано'))
+        .catch(() => console.warn('Не удалось скопировать номер статьи в буфер обмена'));
+}
+
 function renderArticles() {
     const container = document.getElementById('articlesContainer');
 
@@ -348,6 +390,11 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
             </div>
             <div class="desc">${highlightedDesc}</div>
         `;
+
+        const numBadge = card.querySelector('.badge-num');
+        numBadge.title = 'Скопировать номер статьи';
+        numBadge.addEventListener('click', () => copyArticleNumber(article));
+
         container.appendChild(card);
     });
 }
@@ -417,6 +464,13 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
                 </div>
             </div>
         `;
+
+        const numBadge = row.querySelector('.badge-num');
+        numBadge.title = 'Скопировать номер статьи';
+        numBadge.addEventListener('click', (e) => {
+            e.stopPropagation();
+            copyArticleNumber(article);
+        });
 
         const header = row.querySelector('.row-header');
         const toggleExpanded = () => {
