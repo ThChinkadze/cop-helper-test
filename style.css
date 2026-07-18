@@ -108,9 +108,14 @@ body {
     padding-top: 10px; padding-bottom: 20px; 
 }
 
+.search-wrapper {
+    position: relative;
+    margin-bottom: 15px;
+}
+
 #searchInput { 
     width: 100%; 
-    padding: 16px 20px; 
+    padding: 16px 48px 16px 20px; 
     font-size: 18px; 
     font-family: 'Nunito', sans-serif; 
     background-color: var(--control-bg); 
@@ -121,12 +126,28 @@ body {
     box-shadow: var(--control-shadow); 
     transition: border-color 0.2s; 
     box-sizing: border-box; 
-    margin-bottom: 15px; 
 
 }
 
 #searchInput:focus { 
     border-color: var(--accent); 
+}
+
+.forum-link {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-main);
+    transition: color 0.15s ease;
+}
+
+.forum-link:hover,
+.forum-link:focus-visible {
+    color: var(--accent);
 }
 
 .tabs { 
