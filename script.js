@@ -2,7 +2,7 @@ const SHEET_ID = '1ECGNHLbqR8KuPV_QH1E0SO8mGUOm4WIYP-hWWR5PZ-U';
 const SHEET_NAME = encodeURIComponent('База данных'); 
 const TIMEOUT_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}&headers=0`;
 
-const SHEET_NAME_PK = encodeURIComponent('Процессуальный кодекс');
+const SHEET_NAME_PK = encodeURIComponent('Общая информация');
 const PK_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME_PK}&headers=0`;
 
 let parsedDatabase = [];
@@ -77,7 +77,7 @@ function showStaleBanner(savedAt) {
 }
 
 // Общий запрос+разбор gviz-ответа Google Sheets — используется обоими загрузчиками
-// (статьи кодексов и Процессуальный кодекс). Обработка ошибок и раскладка строк по
+// (статьи кодексов и Общая информация). Обработка ошибок и раскладка строк по
 // полям намеренно остаются в каждом загрузчике отдельно (у loadData есть офлайн-кэш
 // и баннер, у loadProceduralData — нет), сюда вынесена только общая часть
 // "получить ответ и распарсить его в массив строк".
@@ -235,7 +235,7 @@ function renderArticles() {
     const filterText = document.getElementById('searchInput').value.toLowerCase().trim();
     const isSearching = filterText.length > 0;
 
-    // Процессуальный кодекс — отдельный тип контента, без плиток/списка и своей
+    // Общая информация — отдельный тип контента, без плиток/списка и своей
     // логикой рендера. Но пока идёт поиск (в том числе начатый на этой вкладке),
     // показываем не карточки ПК, а обычные результаты по УК/АК/ДК — так же, как
     // при поиске с любой другой вкладки. proceduralData в эту выдачу не попадает,
@@ -435,7 +435,7 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
     });
 }
 
-// ===== Процессуальный кодекс: диспетчер шаблонов =====
+// ===== Общая информация: диспетчер шаблонов =====
 // Каждая карточка сама решает, каким шаблоном рендериться (поле "Тип" из таблицы).
 // "text" и "table" пока не реализованы — не встречались в реальном контенте, добавим по необходимости.
 const PK_TEMPLATES = {
