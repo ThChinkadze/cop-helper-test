@@ -435,7 +435,7 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
             const arrestTitle = hasFelony ? `${escapeHtml(article.arrest)}, судимость` : 'Арест';
 
             rightHtml = `
-                <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="Штраф">${safeFine || '—'}</div>
+                <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="${safeFine ? `Штраф: ${safeFine}` : 'Штраф'}">${safeFine || '—'}</div>
                 <div class="row-tag row-slot-stars" title="Розыск">${safeStars || '—'}</div>
                 <div class="row-tag row-slot-arrest ${hasFelony ? 'row-danger' : ''}" title="${arrestTitle}">${safeArrest || '—'}</div>
             `;
@@ -446,7 +446,7 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
 
             rightHtml = `
                 <div class="row-tag row-slot-extra ${hasExtraMeasure ? '' : 'row-hidden'}" title="${hasExtraMeasure ? safeExtraMeasure : ''}">${safeExtraMeasure}</div>
-                <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="Штраф">${safeFine || '—'}</div>
+                <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="${safeFine ? `Штраф: ${safeFine}` : 'Штраф'}">${safeFine || '—'}</div>
             `;
         }
 
@@ -566,6 +566,13 @@ function syncModeToggleUI() {
     });
 }
 
+// Короткие описания сути режима — показываются во всплывающем уведомлении
+// при переключении тумблера, чтобы пользователь понимал, что именно изменилось.
+const DISPLAY_MODE_TOAST = {
+    compact: 'Компактный режим — только частые статьи',
+    full: 'Полный режим — показаны все статьи'
+};
+
 document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', (e) => {
     const selectedMode = e.currentTarget.getAttribute('data-mode');
     if (selectedMode === currentDisplayMode) return;
@@ -573,6 +580,7 @@ document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('clic
     localStorage.setItem(DISPLAY_MODE_KEY, currentDisplayMode);
     syncModeToggleUI();
     renderArticles();
+    showToast(DISPLAY_MODE_TOAST[currentDisplayMode]);
 }));
 
 syncModeToggleUI();
@@ -585,6 +593,13 @@ function syncViewToggleUI() {
     });
 }
 
+// Короткие описания сути вида отображения — та же логика, что и для
+// DISPLAY_MODE_TOAST выше.
+const VIEW_TOAST = {
+    grid: 'Вид: плитки',
+    list: 'Вид: список'
+};
+
 document.querySelectorAll('.view-btn').forEach(btn => btn.addEventListener('click', (e) => {
     const selectedView = e.currentTarget.getAttribute('data-view');
     if (selectedView === currentView) return;
@@ -592,6 +607,7 @@ document.querySelectorAll('.view-btn').forEach(btn => btn.addEventListener('clic
     localStorage.setItem(VIEW_KEY, currentView);
     syncViewToggleUI();
     renderArticles();
+    showToast(VIEW_TOAST[currentView]);
 }));
 
 syncViewToggleUI();
