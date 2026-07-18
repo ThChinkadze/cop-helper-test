@@ -520,12 +520,13 @@ body {
     left: 50%;
     bottom: 32px;
     transform: translate(-50%, 12px);
-    background-color: var(--success);
-    color: #0c1f0f;
-    font-size: 14px;
+    background-color: var(--control-bg);
+    color: #e2e2e6;
+    font-size: 13px;
     font-weight: 700;
-    padding: 10px 20px;
+    padding: 10px 18px;
     border-radius: 8px;
+    border: 1px solid var(--accent);
     box-shadow: var(--control-shadow);
     opacity: 0;
     pointer-events: none;
