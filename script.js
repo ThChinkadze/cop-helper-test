@@ -28,11 +28,12 @@ let currentZoom = (Number.isInteger(storedZoom) && storedZoom >= ZOOM_MIN && sto
     : 100;
 
 const TYPE_LABELS = {
-    'F': 'Федеральная',
-    'R': 'Региональная',
-    'F/R': 'Федеральная/Региональная',
-    'FIN': 'Финансовая',
-    'R/FIN': 'Региональная/Финансовая'
+    'Ф': 'Федеральная',
+    'Р': 'Региональная',
+    'Ф/Р': 'Федеральная/Региональная',
+    'ФИН': 'Финансовая',
+    'Р/ФИН': 'Региональная/Финансовая',
+    'В': 'Военная'
 };
 
 const CACHE_KEY = 'majestic_portland_pravovaya_baza_cache_v1';
