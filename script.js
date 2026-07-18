@@ -432,7 +432,9 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
             const safeFine = escapeHtml(article.fine);
             const safeArrest = escapeHtml(article.arrest);
             const hasFelony = hasFelonyRecord(article);
-            const arrestTitle = hasFelony ? `${escapeHtml(article.arrest)}, судимость` : 'Арест';
+            const arrestTitle = safeArrest
+                ? `${safeArrest}, ${hasFelony ? 'судимость' : 'без судимости'}`
+                : 'Арест';
 
             rightHtml = `
                 <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="${safeFine ? `Штраф: ${safeFine}` : 'Штраф'}">${safeFine || '—'}</div>
