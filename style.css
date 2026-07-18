@@ -137,17 +137,18 @@ body {
     position: absolute;
     right: 14px;
     top: 50%;
-    transform: translateY(-50%);
+    transform: translateY(-50%) scale(1);
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--text-main);
-    transition: color 0.15s ease;
+    transition: color 0.15s ease, transform 0.15s ease;
 }
 
 .forum-link:hover,
 .forum-link:focus-visible {
     color: var(--accent);
+    transform: translateY(-50%) scale(1.15);
 }
 
 .tabs { 
