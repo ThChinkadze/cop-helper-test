@@ -345,6 +345,23 @@ function hasFelonyRecord(article) {
     return article.felony.toLowerCase().includes('судимость');
 }
 
+// Склоняет слово "звезда" по числу (1 звезда / 2-4 звезды / 5+ звёзд) с учётом
+// исключений на 11-14. Считает количество звёзд по длине строки article.stars
+// (значение хранится как повторяющиеся символы "★").
+function pluralizeStars(count) {
+    const mod10 = count % 10;
+    const mod100 = count % 100;
+    if (mod10 === 1 && mod100 !== 11) return 'звезда';
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'звезды';
+    return 'звёзд';
+}
+
+function starsTitle(article) {
+    const count = article.stars.length;
+    if (!count) return 'Розыск';
+    return `${count} ${pluralizeStars(count)}`;
+}
+
 // Готовит подсвеченные (уже экранированные) поля статьи — заголовок, номер,
 // описание. Общая логика для карточек и списка: раньше этот блок был дословно
 // продублирован в начале renderAsCards и renderAsList.
@@ -438,7 +455,7 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
 
             rightHtml = `
                 <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="${safeFine ? `Штраф: ${safeFine}` : 'Штраф'}">${safeFine || '—'}</div>
-                <div class="row-tag row-slot-stars" title="Розыск">${safeStars || '—'}</div>
+                <div class="row-tag row-slot-stars" title="${starsTitle(article)}">${safeStars || '—'}</div>
                 <div class="row-tag row-slot-arrest ${hasFelony ? 'row-danger' : ''}" title="${arrestTitle}">${safeArrest || '—'}</div>
             `;
         } else {
