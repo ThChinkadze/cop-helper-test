@@ -27,6 +27,12 @@ let currentZoom = (Number.isInteger(storedZoom) && storedZoom >= ZOOM_MIN && sto
     ? storedZoom
     : 100;
 
+// Настройка "Уведомления тумблеров" в панели настроек — включает/выключает
+// показ toast-уведомлений при переключении режима отображения и вида
+// (compact/full, плитки/список). Не влияет на уведомление "Скопировано".
+const NOTIFICATIONS_KEY = 'majestic_portland_toggle_notifications';
+let toggleNotificationsEnabled = localStorage.getItem(NOTIFICATIONS_KEY) !== 'false';
+
 const CODE_LABELS = {
     'uk': 'УК',
     'ak': 'АК',
@@ -599,7 +605,7 @@ document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('clic
     localStorage.setItem(DISPLAY_MODE_KEY, currentDisplayMode);
     syncModeToggleUI();
     renderArticles();
-    showToast(DISPLAY_MODE_TOAST[currentDisplayMode]);
+    if (toggleNotificationsEnabled) showToast(DISPLAY_MODE_TOAST[currentDisplayMode]);
 }));
 
 syncModeToggleUI();
@@ -626,7 +632,7 @@ document.querySelectorAll('.view-btn').forEach(btn => btn.addEventListener('clic
     localStorage.setItem(VIEW_KEY, currentView);
     syncViewToggleUI();
     renderArticles();
-    showToast(VIEW_TOAST[currentView]);
+    if (toggleNotificationsEnabled) showToast(VIEW_TOAST[currentView]);
 }));
 
 syncViewToggleUI();
@@ -688,6 +694,14 @@ settingsBtn.addEventListener('click', (e) => {
 
 settingsPanel.addEventListener('click', (e) => {
     e.stopPropagation();
+});
+
+// ===== Настройка "Уведомления тумблеров" =====
+const notificationsToggle = document.getElementById('notificationsToggle');
+notificationsToggle.checked = toggleNotificationsEnabled;
+notificationsToggle.addEventListener('change', () => {
+    toggleNotificationsEnabled = notificationsToggle.checked;
+    localStorage.setItem(NOTIFICATIONS_KEY, String(toggleNotificationsEnabled));
 });
 
 document.addEventListener('click', () => {
