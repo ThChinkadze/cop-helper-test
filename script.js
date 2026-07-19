@@ -33,6 +33,43 @@ let currentZoom = (Number.isInteger(storedZoom) && storedZoom >= ZOOM_MIN && sto
 const NOTIFICATIONS_KEY = 'majestic_portland_toggle_notifications';
 let toggleNotificationsEnabled = localStorage.getItem(NOTIFICATIONS_KEY) !== 'false';
 
+// Закреплённые статьи (только УК/АК/ДК — "Общая информация" не участвует).
+// Идентификатор статьи — связка кода кодекса и номера статьи, этого достаточно
+// для уникальности в пределах базы. Храним как Set в памяти для быстрой проверки
+// isPinned() при рендере каждой карточки/строки, персистим как JSON-массив.
+const PINNED_KEY = 'majestic_portland_pinned_articles';
+let pinnedArticles = new Set(loadPinnedArticles());
+
+function loadPinnedArticles() {
+    try {
+        const raw = JSON.parse(localStorage.getItem(PINNED_KEY));
+        return Array.isArray(raw) ? raw : [];
+    } catch {
+        return [];
+    }
+}
+
+function articleId(article) {
+    return `${article.code}::${article.num}`;
+}
+
+function isPinned(article) {
+    return pinnedArticles.has(articleId(article));
+}
+
+// Переключает закрепление статьи, сохраняет в localStorage и перерисовывает
+// список — закреплённая статья должна сразу подняться в начало своей категории.
+function togglePinned(article) {
+    const id = articleId(article);
+    if (pinnedArticles.has(id)) {
+        pinnedArticles.delete(id);
+    } else {
+        pinnedArticles.add(id);
+    }
+    localStorage.setItem(PINNED_KEY, JSON.stringify([...pinnedArticles]));
+    renderArticles();
+}
+
 const CODE_LABELS = {
     'uk': 'УК',
     'ak': 'АК',
@@ -325,8 +362,15 @@ function renderArticles() {
         matchedArticles.push({ article, matchScore });
     });
 
-    // Сортируем: те, где нашлось больше слов — выше
-    matchedArticles.sort((a, b) => b.matchScore - a.matchScore);
+    // Вне поиска — закреплённые статьи поднимаются в начало (внутри своего режима
+    // отображения: закрепление внутри compact "видит" только частые статьи, так
+    // как редкие уже отфильтрованы выше), остальной порядок не меняется благодаря
+    // стабильной сортировке. При активном поиске закрепление игнорируется —
+    // работает только сортировка по релевантности.
+    matchedArticles.sort((a, b) => {
+        if (isSearching) return b.matchScore - a.matchScore;
+        return (isPinned(b.article) ? 1 : 0) - (isPinned(a.article) ? 1 : 0);
+    });
 
     container.innerHTML = "";
     container.className = currentView === 'list' ? 'list-view' : '';
@@ -386,7 +430,7 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
         const article = item.article;
 
         const card = document.createElement('div');
-        card.className = `card ${article.code}`;
+        card.className = `card ${article.code} ${isPinned(article) ? 'pinned' : ''}`;
 
         const { title: highlightedTitle, num: highlightedNum, desc: highlightedDesc } =
             buildHighlightedFields(article, isSearching, searchWords);
@@ -401,7 +445,10 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
 
         card.innerHTML = `
             <div class="card-header">
-                <div class="title">${highlightedTitle}</div>
+                <div class="title-row">
+                    <button class="pin-btn" title="${isPinned(article) ? 'Открепить статью' : 'Закрепить статью'}" aria-label="${isPinned(article) ? 'Открепить статью' : 'Закрепить статью'}" aria-pressed="${isPinned(article)}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 4V11L6 15V17H18V15L15 11V4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 17V21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 4H17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+                    <div class="title">${highlightedTitle}</div>
+                </div>
                 <div class="card-header-right">${typeHtml}<div class="badge-num">ст. ${highlightedNum}</div></div>
             </div>
             <div class="info-table">
@@ -418,6 +465,9 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
         numBadge.title = 'Скопировать номер статьи';
         numBadge.addEventListener('click', () => copyArticleNumber(article));
 
+        const pinBtn = card.querySelector('.pin-btn');
+        pinBtn.addEventListener('click', () => togglePinned(article));
+
         container.appendChild(card);
     });
 }
@@ -430,7 +480,7 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
         const article = item.article;
 
         const row = document.createElement('div');
-        row.className = `row ${article.code}`;
+        row.className = `row ${article.code} ${isPinned(article) ? 'pinned' : ''}`;
 
         const { title: highlightedTitle, num: highlightedNum, desc: highlightedDesc } =
             buildHighlightedFields(article, isSearching, searchWords);
@@ -443,7 +493,7 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
         const leftHtml = `
             ${typeHtml}
             <div class="badge-num row-num row-slot-num">ст. ${highlightedNum}</div>
-            <div class="row-title">${highlightedTitle}</div>
+            <div class="row-title"><button class="pin-btn" title="${isPinned(article) ? 'Открепить статью' : 'Закрепить статью'}" aria-label="${isPinned(article) ? 'Открепить статью' : 'Закрепить статью'}" aria-pressed="${isPinned(article)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 4V11L6 15V17H18V15L15 11V4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 17V21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 4H17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>${highlightedTitle}</div>
         `;
 
         // Правая часть строки: для УК — звёзды/штраф/арест (арест краснеет при судимости),
@@ -497,6 +547,12 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
             copyArticleNumber(article);
         });
 
+        const pinBtn = row.querySelector('.pin-btn');
+        pinBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            togglePinned(article);
+        });
+
         const header = row.querySelector('.row-header');
         const toggleExpanded = () => {
             const willExpand = !row.classList.contains('expanded');
@@ -505,6 +561,7 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
         };
         header.addEventListener('click', toggleExpanded);
         header.addEventListener('keydown', (e) => {
+            if (e.target.closest('.pin-btn')) return;
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 toggleExpanded();
