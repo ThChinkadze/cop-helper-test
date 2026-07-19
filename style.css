@@ -629,8 +629,9 @@ body {
    себе) и в списке (.row-num добавляет только особенности слота фиксированной
    ширины поверх этой базы) */
 .badge-num { 
-    display: inline-flex;
+    display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 5px;
     font-size: 13px; 
     font-weight: 700; 
