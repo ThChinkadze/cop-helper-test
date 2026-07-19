@@ -629,7 +629,6 @@ body {
    себе) и в списке (.row-num добавляет только особенности слота фиксированной
    ширины поверх этой базы) */
 .badge-num { 
-    position: relative;
     font-size: 13px; 
     font-weight: 700; 
     color: #e2e2e6; 
@@ -638,41 +637,13 @@ body {
     border-radius: 6px; 
     border: 1px solid var(--control-border); 
     white-space: nowrap; 
-    text-align: center;
     cursor: pointer;
     transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.badge-num-text {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.badge-copy-icon {
-    position: absolute;
-    bottom: -1px;
-    right: -1px;
-    width: 14px;
-    height: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: var(--control-border);
-    border-radius: 6px 0 6px 0;
-    color: #9a9a9e;
-    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .badge-num:hover {
     background-color: var(--accent);
     border-color: var(--accent);
-    color: #ffffff;
-}
-
-.badge-num:hover .badge-copy-icon {
-    background-color: rgba(255, 255, 255, 0.25);
     color: #ffffff;
 }
 
@@ -910,7 +881,9 @@ body {
 .row-num {
     flex-shrink: 0;
     box-sizing: border-box;
+    text-align: center;
     overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .row-title {
@@ -960,7 +933,7 @@ body {
 /* Фиксированные ширины колонок — гарантируют, что параметры всегда стоят
    в одной и той же горизонтальной позиции, независимо от длины значения. */
 .row-slot-type   { width: 54px; flex-shrink: 0; }
-.row-slot-num    { width: 125px; }
+.row-slot-num    { width: 112px; }
 .row-slot-stars  { width: 88px; }
 .row-slot-fine   { width: 168px; }
 .row-slot-arrest { width: 140px; }
