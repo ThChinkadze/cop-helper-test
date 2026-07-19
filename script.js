@@ -11,7 +11,7 @@ let currentCode = "uk";
 let searchDebounceTimer;
 
 const VIEW_KEY = 'majestic_portland_view_mode';
-let currentView = localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid';
+let currentView = localStorage.getItem(VIEW_KEY) === 'grid' ? 'grid' : 'list';
 
 // Режим отображения по частоте статей: 'compact' (только частые) — дефолт,
 // или 'full' (все статьи). Общий для УК/АК/ДК, не зависит от currentCode.
