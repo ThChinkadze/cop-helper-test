@@ -636,7 +636,7 @@ body {
     font-weight: 700; 
     color: #e2e2e6; 
     background-color: var(--control-bg); 
-    padding: 4px 8px 4px 10px; 
+    padding: 4px 10px; 
     border-radius: 6px; 
     border: 1px solid var(--control-border); 
     white-space: nowrap; 
@@ -900,9 +900,7 @@ body {
 .row-num {
     flex-shrink: 0;
     box-sizing: border-box;
-    text-align: center;
     overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .row-title {
@@ -952,7 +950,7 @@ body {
 /* Фиксированные ширины колонок — гарантируют, что параметры всегда стоят
    в одной и той же горизонтальной позиции, независимо от длины значения. */
 .row-slot-type   { width: 54px; flex-shrink: 0; }
-.row-slot-num    { width: 160px; }
+.row-slot-num    { width: 150px; }
 .row-slot-stars  { width: 88px; }
 .row-slot-fine   { width: 168px; }
 .row-slot-arrest { width: 140px; }
