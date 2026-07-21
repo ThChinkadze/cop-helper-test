@@ -980,7 +980,7 @@ body {
     background: var(--card-bg);
     border-radius: 14px;
     padding: 26px 28px;
-    max-width: 440px;
+    max-width: 470px;
     width: 100%;
     max-height: 85vh;
     overflow-y: auto;
@@ -1018,42 +1018,18 @@ body {
     color: var(--text-title);
 }
 
-.modal-intro {
-    font-size: 13px;
-    color: var(--text-muted);
-    margin-bottom: 18px;
-}
-
-.onboarding-features {
-    list-style: none;
-    margin: 0 0 22px 0;
-    padding: 0;
+.modal-body {
     display: flex;
     flex-direction: column;
     gap: 14px;
+    margin-bottom: 22px;
 }
 
-.onboarding-features li {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-}
-
-.onboarding-features svg {
-    flex-shrink: 0;
-    margin-top: 2px;
-    color: var(--accent);
-}
-
-.onboarding-features div {
+.modal-body p {
+    margin: 0;
     font-size: 13.5px;
     color: var(--text-muted);
-    line-height: 1.4;
-}
-
-.onboarding-features strong {
-    color: var(--text-title);
-    font-weight: 800;
+    line-height: 1.6;
 }
 
 .modal-confirm-btn {
