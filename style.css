@@ -409,6 +409,13 @@ body {
     color: var(--text-title);
 }
 
+.settings-meta-date {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
 .switch {
     position: relative;
     display: inline-block;
