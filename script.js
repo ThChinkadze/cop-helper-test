@@ -850,25 +850,6 @@ updateScrollTopVisibility();
 // ===== Онбординг-модалка (первый визит) =====
 const ONBOARDING_KEY = 'majestic_portland_onboarding_seen';
 const onboardingOverlay = document.getElementById('onboardingOverlay');
-
-function closeOnboarding() {
-    onboardingOverlay.classList.remove('open');
-    localStorage.setItem(ONBOARDING_KEY, 'true');
-}
-
-document.getElementById('onboardingCloseBtn').addEventListener('click', closeOnboarding);
-document.getElementById('onboardingCloseX').addEventListener('click', closeOnboarding);
-onboardingOverlay.addEventListener('click', (e) => {
-    if (e.target === onboardingOverlay) closeOnboarding();
-});
-
-if (localStorage.getItem(ONBOARDING_KEY) !== 'true') {
-    onboardingOverlay.classList.add('open');
-}
-
-// ===== Онбординг-модалка (первый визит) =====
-const ONBOARDING_KEY = 'majestic_portland_onboarding_seen';
-const onboardingOverlay = document.getElementById('onboardingOverlay');
 const onboardingCloseBtn = document.getElementById('onboardingCloseBtn');
 const onboardingCloseX = document.getElementById('onboardingCloseX');
 
