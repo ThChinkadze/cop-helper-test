@@ -288,7 +288,7 @@ function buildTypeBadge(article, extraClass = '') {
 // статью нет — возвращает '', иконка в тексте просто не появляется.
 function buildForumLinkIcon(article) {
     if (!article.forumUrl) return '';
-    return `<a class="desc-forum-link" target="_blank" rel="noopener" title="Открыть статью на форуме" aria-label="Открыть статью на форуме"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15L15 9"/><path d="M11 6l1.1-1.1a3.5 3.5 0 0 1 5 5L16 11"/><path d="M13 18l-1.1 1.1a3.5 3.5 0 0 1-5-5L8 13"/></svg></a>`;
+    return `<a class="desc-forum-link" target="_blank" rel="noopener" title="Открыть статью на форуме" aria-label="Открыть статью на форуме"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 18L18 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M8 6H18V16" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>`;
 }
 
 // Проставляет href всем иконкам-ссылкам на форум внутри переданного элемента
