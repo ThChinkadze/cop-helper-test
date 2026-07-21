@@ -677,8 +677,8 @@ function syncModeToggleUI() {
 // Короткие описания сути режима — показываются во всплывающем уведомлении
 // при переключении тумблера, чтобы пользователь понимал, что именно изменилось.
 const DISPLAY_MODE_TOAST = {
-    compact: 'Компактный режим — только частые статьи',
-    full: 'Полный режим — показаны все статьи'
+    compact: 'Основные статьи',
+    full: 'Все статьи'
 };
 
 document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', (e) => {
