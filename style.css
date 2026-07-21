@@ -245,9 +245,10 @@ body {
     flex-shrink: 0;
     gap: 4px;
     background-color: var(--control-bg);
+    border: 1px solid var(--control-border);
     border-radius: 8px;
     padding: 4px;
-    box-shadow: var(--control-shadow);
+    box-sizing: border-box;
 }
 
 .view-btn {
@@ -323,6 +324,9 @@ body {
     transform: translateY(-6px);
     pointer-events: none;
     transition: opacity 0.15s ease, transform 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
 }
 
 .settings-panel.open {
@@ -331,19 +335,11 @@ body {
     pointer-events: auto;
 }
 
-.settings-label {
-    display: block;
-    font-size: 13px;
-    font-weight: 800;
-    color: var(--text-main);
-    margin-bottom: 10px;
-}
-
 .zoom-control {
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: 12px;
+    flex-shrink: 0;
 }
 
 .zoom-step-btn {
@@ -386,21 +382,28 @@ body {
 .settings-divider {
     height: 1px;
     background-color: var(--control-border);
-    margin: 14px 0;
 }
 
-.settings-row {
+/* Один общий паттерн для всех пунктов настроек: подпись слева, контрол
+   справа. Отступы между пунктами задаёт "gap" на .settings-panel — сюда
+   не нужно ничего добавлять, когда появится новый параметр, достаточно
+   дописать ещё один .settings-item в разметку.
+   Модификатор .wide (сейчас не используется, задел на будущее) — для
+   контролов, которым не хватает места в строке: подпись переносится
+   наверх, а контрол растягивается на всю ширину под ней. */
+.settings-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
 }
 
-.settings-row + .settings-row {
-    margin-top: 14px;
+.settings-item.wide {
+    flex-direction: column;
+    align-items: stretch;
 }
 
-.settings-row-label {
+.settings-item-label {
     font-size: 13px;
     font-weight: 700;
     color: var(--text-title);
