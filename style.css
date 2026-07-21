@@ -719,6 +719,19 @@ body {
     overflow-y: auto; 
 }
 
+.desc-forum-link {
+    display: inline-flex;
+    vertical-align: -2px;
+    margin-left: 4px;
+    color: var(--text-main);
+    transition: color 0.15s ease;
+}
+
+.desc-forum-link:hover,
+.desc-forum-link:focus-visible {
+    color: var(--accent);
+}
+
 .loader { 
     text-align: center; 
     font-size: 18px; 
