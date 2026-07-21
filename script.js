@@ -824,6 +824,29 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+// ===== Кнопка "наверх" =====
+const SCROLL_TOP_THRESHOLD = 600;
+const scrollTopBtn = document.getElementById('scrollTopBtn');
+let scrollTicking = false;
+
+function updateScrollTopVisibility() {
+    scrollTopBtn.classList.toggle('visible', window.scrollY > SCROLL_TOP_THRESHOLD);
+    scrollTicking = false;
+}
+
+window.addEventListener('scroll', () => {
+    if (!scrollTicking) {
+        requestAnimationFrame(updateScrollTopVisibility);
+        scrollTicking = true;
+    }
+});
+
+scrollTopBtn.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+updateScrollTopVisibility();
+
 document.getElementById('searchInput').addEventListener('input', () => {
     clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(renderArticles, 150);
