@@ -17,10 +17,12 @@
     --control-bg: #2c2c2e;
     --control-border: #3a3a3c;
     --pinned-bg: #272729;
+    --surface-alt: #262628;
+    --divider: #252525;
+    --text-muted: #8e8e93;
 }
 
-/* Тонкий скроллбар в цвет темы — применяется ко всей странице
-   и любому внутреннему блоку с прокруткой (текущему и будущему) */
+/* Тонкий скроллбар в цвет темы — для всей страницы и любого блока с прокруткой */
 * {
     scrollbar-width: thin; /* Firefox */
     scrollbar-color: var(--scrollbar-thumb) transparent; /* Firefox */
@@ -44,9 +46,7 @@
     background-color: var(--scrollbar-thumb-hover);
 }
 
-/* Всегда резервируем место под вертикальный скроллбар страницы —
-   иначе при переключении вкладок (когда контент то помещается, то нет)
-   весь интерфейс "дёргается" вправо-влево из-за появления/исчезновения полосы */
+/* Резервируем место под скроллбар — иначе интерфейс "дёргается" при переключении вкладок */
 html {
     overflow-y: scroll;
 }
@@ -66,11 +66,8 @@ body {
         padding: 10px;
     }
 
-    /* Горизонтальный скролл вкладок нужен только на узких экранах —
-       на десктопе ширины шапки достаточно и без него (см. .tabs).
-       overflow-x:auto здесь неизбежно обрезает вертикальную часть теней
-       кнопок вкладок (спецификация CSS переводит overflow-y тоже в auto),
-       но на мобильном это меньшее зло по сравнению с нечитаемым рядом вкладок. */
+    /* Только для узких экранов. ВАЖНО: overflow-x:auto попутно обрезает
+       вертикальную часть теней кнопок (спецификация переводит overflow-y тоже в auto). */
     .tabs {
         overflow-x: auto;
         scrollbar-width: none;
@@ -80,8 +77,7 @@ body {
         display: none;
     }
 
-    /* Компактный вид (список строк) на узких экранах — переносим строку
-       вместо горизонтального сжатия колонок */
+    /* Список на узких экранах — перенос строки вместо сжатия колонок */
     .row-header {
         flex-wrap: wrap;
     }
@@ -167,7 +163,7 @@ body {
     font-size: 15px; 
     font-weight: 800; 
     background-color: var(--control-bg); 
-    color: #8e8e93; 
+    color: var(--text-muted); 
     border: none; 
     border-radius: 8px; 
     cursor: pointer; 
@@ -186,8 +182,6 @@ body {
     color: var(--text-title); 
 }
 
-/* Модификатор для кнопки повтора загрузки в .loader — раньше эти три свойства
-   были заданы инлайн-стилем прямо в script.js, единственное такое место в проекте */
 .retry-btn {
     margin-top: 12px;
     flex: none;
@@ -223,7 +217,7 @@ body {
     width: 40px;
     padding: 0;
     background-color: transparent;
-    color: #8e8e93;
+    color: var(--text-muted);
     border: none;
     border-radius: 6px;
     cursor: pointer;
@@ -259,7 +253,7 @@ body {
     height: 32px;
     padding: 0;
     background-color: transparent;
-    color: #8e8e93;
+    color: var(--text-muted);
     border: none;
     border-radius: 6px;
     cursor: pointer;
@@ -289,7 +283,7 @@ body {
     height: 100%;
     padding: 0;
     background-color: var(--control-bg);
-    color: #8e8e93;
+    color: var(--text-muted);
     border: none;
     border-radius: 8px;
     cursor: pointer;
@@ -384,13 +378,8 @@ body {
     background-color: var(--control-border);
 }
 
-/* Один общий паттерн для всех пунктов настроек: подпись слева, контрол
-   справа. Отступы между пунктами задаёт "gap" на .settings-panel — сюда
-   не нужно ничего добавлять, когда появится новый параметр, достаточно
-   дописать ещё один .settings-item в разметку.
-   Модификатор .wide (сейчас не используется, задел на будущее) — для
-   контролов, которым не хватает места в строке: подпись переносится
-   наверх, а контрол растягивается на всю ширину под ней. */
+/* Общий паттерн: подпись слева, контрол справа. Отступы — через gap на .settings-panel.
+   .wide (пока не используется) — подпись сверху, контрол на всю ширину. */
 .settings-item {
     display: flex;
     align-items: center;
@@ -509,7 +498,7 @@ body {
     font-size: 13.5px;
     line-height: 1.6;
     color: #c4c4c9;
-    border-top: 1px solid #252525;
+    border-top: 1px solid var(--divider);
     padding-top: 12px;
 }
 
@@ -550,8 +539,7 @@ body {
     justify-content: center;
 }
 
-/* Маркированный список (тип "list") — та же плотность/ритм, что и у "steps",
-   но маркер — простая точка, без нумерации (порядок пунктов не важен) */
+/* Маркированный список ("list") — та же плотность, что у "steps", но без нумерации */
 .pk-list {
     list-style: none;
     margin: 0;
@@ -640,9 +628,7 @@ body {
     opacity: 1;
 }
 
-/* Общий базовый бейдж для номера статьи — переиспользуется в карточках (сам по
-   себе) и в списке (.row-num добавляет только особенности слота фиксированной
-   ширины поверх этой базы) */
+/* Базовый бейдж номера — переиспользуется в карточках и списке (.row-num добавляет слот) */
 .badge-num { 
     font-size: 13px; 
     font-weight: 700; 
@@ -662,8 +648,6 @@ body {
     color: #ffffff;
 }
 
-/* Уведомление "Скопировано" — фиксировано внизу экрана, скрыто по умолчанию
-   и появляется/исчезает плавным переходом через класс .toast-visible */
 .toast {
     position: fixed;
     left: 50%;
@@ -689,7 +673,7 @@ body {
 }
 
 .info-table { 
-    background-color: #262628; 
+    background-color: var(--surface-alt); 
     border-radius: 8px; 
     padding: 10px 12px; 
     border: 1px solid var(--control-border); 
@@ -709,7 +693,7 @@ body {
 }
 
 .info-label { 
-    color: #8e8e93; 
+    color: var(--text-muted); 
     font-weight: 600; 
     flex-shrink: 0; 
 }
@@ -728,7 +712,7 @@ body {
     font-size: 13px; 
     line-height: 1.4; 
     color: var(--text-main); 
-    border-top: 1px solid #252525; 
+    border-top: 1px solid var(--divider); 
     padding-top: 8px; 
     margin: 0; 
     overflow-y: auto; 
@@ -888,7 +872,7 @@ body {
 
 .row-desc {
     padding: 10px 16px 14px 16px;
-    border-top: 1px solid #252525;
+    border-top: 1px solid var(--divider);
     font-size: 13px;
     line-height: 1.5;
     color: var(--text-main);
@@ -935,7 +919,7 @@ body {
     font-size: 13px;
     font-weight: 700;
     color: var(--text-title);
-    background-color: #262628;
+    background-color: var(--surface-alt);
     border: 1px solid var(--control-border);
     padding: 4px 10px;
     border-radius: 6px;
@@ -958,8 +942,7 @@ body {
     border-color: var(--uk-color);
 }
 
-/* Фиксированные ширины колонок — гарантируют, что параметры всегда стоят
-   в одной и той же горизонтальной позиции, независимо от длины значения. */
+/* Фиксированная ширина — параметры всегда стоят в одной позиции */
 .row-slot-type   { width: 54px; flex-shrink: 0; }
 .row-slot-num    { width: 112px; }
 .row-slot-stars  { width: 88px; }
@@ -967,8 +950,7 @@ body {
 .row-slot-arrest { width: 140px; }
 .row-slot-extra  { width: 168px; }
 
-/* Скрывает содержимое слота (доп. мера отсутствует), но сохраняет его ширину,
-   чтобы соседние колонки (штраф) не сдвигались */
+/* Скрывает содержимое, но сохраняет ширину слота — соседние колонки не сдвигаются */
 .row-hidden {
     visibility: hidden;
 }
