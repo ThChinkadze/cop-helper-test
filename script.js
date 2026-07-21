@@ -187,7 +187,8 @@ async function loadData() {
                 felony: getVal(8),
                 type: getVal(9),   
                 tags: getVal(10),
-                frequency: normalizeFrequency(getVal(11))
+                frequency: normalizeFrequency(getVal(11)),
+                forumUrl: getVal(12)
             });
         });
         saveCache(parsedDatabase);
@@ -277,6 +278,27 @@ function buildTypeBadge(article, extraClass = '') {
     if (!safeType || safeType === '-') return '';
     const typeLabel = TYPE_LABELS[article.type] || '';
     return `<div class="article-type ${extraClass}" title="${escapeHtml(typeLabel)}">${safeType}</div>`;
+}
+
+// Строит инлайн-иконку-ссылку "перейти к статье на форуме" для конца текста
+// описания. href намеренно не пишется прямо в разметку (ссылка вида
+// "...#:~:text=..." может содержать спецсимволы) — вместо этого рендерится
+// пустой якорь с маркерным классом, а href проставляется отдельно через
+// element.href после вставки в DOM (см. attachForumLink). Если ссылки на
+// статью нет — возвращает '', иконка в тексте просто не появляется.
+function buildForumLinkIcon(article) {
+    if (!article.forumUrl) return '';
+    return `<a class="desc-forum-link" target="_blank" rel="noopener" title="Открыть статью на форуме" aria-label="Открыть статью на форуме"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15L15 9"/><path d="M11 6l1.1-1.1a3.5 3.5 0 0 1 5 5L16 11"/><path d="M13 18l-1.1 1.1a3.5 3.5 0 0 1-5-5L8 13"/></svg></a>`;
+}
+
+// Проставляет href всем иконкам-ссылкам на форум внутри переданного элемента
+// (карточка или строка). Один вызов на каждую отрисованную карточку/строку —
+// внутри неё максимум одна такая иконка (в конце описания), но querySelectorAll
+// используется на случай будущих изменений разметки, а не по необходимости сейчас.
+function attachForumLinks(root, article) {
+    root.querySelectorAll('.desc-forum-link').forEach(link => {
+        link.href = article.forumUrl;
+    });
 }
 
 // Показывает короткое всплывающее уведомление внизу экрана. Переиспользует один
@@ -458,7 +480,7 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
                 <div class="info-row"><div class="info-label">Судимость</div><div class="info-val ${hasFelonyRecord(article) ? 'danger' : ''}">${safeFelony || '—'}</div></div>
                 <div class="info-row"><div class="info-label">Доп. мера</div><div class="info-val">${safeExtraMeasure || '—'}</div></div>
             </div>
-            <div class="desc">${highlightedDesc}</div>
+            <div class="desc">${highlightedDesc}${buildForumLinkIcon(article)}</div>
         `;
 
         const numBadge = card.querySelector('.badge-num');
@@ -467,6 +489,8 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
 
         const pinBtn = card.querySelector('.pin-btn');
         pinBtn.addEventListener('click', () => togglePinned(article));
+
+        attachForumLinks(card, article);
 
         container.appendChild(card);
     });
@@ -535,7 +559,7 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
             </div>
             <div class="row-desc-wrapper">
                 <div class="row-desc-inner">
-                    <div class="row-desc">${highlightedDesc}</div>
+                    <div class="row-desc">${highlightedDesc}${buildForumLinkIcon(article)}</div>
                 </div>
             </div>
         `;
@@ -552,6 +576,8 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
             e.stopPropagation();
             togglePinned(article);
         });
+
+        attachForumLinks(row, article);
 
         const header = row.querySelector('.row-header');
         const toggleExpanded = () => {
