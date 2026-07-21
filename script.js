@@ -1,3 +1,4 @@
+// ===== Настройки Google Sheets =====
 const SHEET_ID = '1ECGNHLbqR8KuPV_QH1E0SO8mGUOm4WIYP-hWWR5PZ-U'; 
 const SHEET_NAME = encodeURIComponent('База данных'); 
 const TIMEOUT_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}&headers=0`;
@@ -8,16 +9,17 @@ const PK_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet
 const SHEET_NAME_META = encodeURIComponent('Последняя редакция');
 const META_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME_META}&headers=0`;
 
+// ===== Состояние приложения =====
 let parsedDatabase = [];
 let proceduralData = [];
 let currentCode = "uk";
 let searchDebounceTimer;
 
+// ===== Вид отображения (плитки/список) =====
 const VIEW_KEY = 'majestic_portland_view_mode';
 let currentView = localStorage.getItem(VIEW_KEY) === 'grid' ? 'grid' : 'list';
 
-// Режим отображения по частоте статей: 'compact' (только частые) — дефолт,
-// или 'full' (все статьи). Общий для УК/АК/ДК, не зависит от currentCode.
+// ===== Режим отображения (compact/full) =====
 const DISPLAY_MODE_KEY = 'majestic_portland_display_mode';
 let currentDisplayMode = localStorage.getItem(DISPLAY_MODE_KEY) === 'full' ? 'full' : 'compact';
 
@@ -30,24 +32,15 @@ let currentZoom = (Number.isInteger(storedZoom) && storedZoom >= ZOOM_MIN && sto
     ? storedZoom
     : 100;
 
-// Настройка "Уведомления тумблеров" в панели настроек — включает/выключает
-// показ toast-уведомлений при переключении режима отображения и вида
-// (compact/full, плитки/список). Не влияет на уведомление "Скопировано".
-// Дата последней редакции БД (лист "Последняя редакция", A2) — вписывается вручную,
-// когда правки по статьям осознанно завершены. DB_DATE_SEEN_KEY хранит дату, которую
-// этот браузер уже видел; DB_DATE_TOAST_DAY_KEY — календарный день, когда тост
-// в последний раз показывался (чтобы не дёргать пользователя при каждой
-// перезагрузке в течение одной смены).
+// ===== Дата последней редакции =====
 const DB_DATE_SEEN_KEY = 'majestic_portland_db_date_seen';
 const DB_DATE_TOAST_DAY_KEY = 'majestic_portland_db_date_toast_day';
 
+// ===== Уведомления тумблеров =====
 const NOTIFICATIONS_KEY = 'majestic_portland_toggle_notifications';
 let toggleNotificationsEnabled = localStorage.getItem(NOTIFICATIONS_KEY) !== 'false';
 
-// Закреплённые статьи (только УК/АК/ДК — "Общая информация" не участвует).
-// Идентификатор статьи — связка кода кодекса и номера статьи, этого достаточно
-// для уникальности в пределах базы. Храним как Set в памяти для быстрой проверки
-// isPinned() при рендере каждой карточки/строки, персистим как JSON-массив.
+// ===== Пины статей =====
 const PINNED_KEY = 'majestic_portland_pinned_articles';
 let pinnedArticles = new Set(loadPinnedArticles());
 
@@ -68,8 +61,6 @@ function isPinned(article) {
     return pinnedArticles.has(articleId(article));
 }
 
-// Переключает закрепление статьи, сохраняет в localStorage и перерисовывает
-// список — закреплённая статья должна сразу подняться в начало своей категории.
 function togglePinned(article) {
     const id = articleId(article);
     if (pinnedArticles.has(id)) {
@@ -87,6 +78,9 @@ const CODE_LABELS = {
     'dk': 'ДК'
 };
 
+// Код кодекса из таблицы (UK/AK/DK) -> внутренний нижний регистр
+const CODE_MAP = {'UK':'uk','AK':'ak','DK':'dk'};
+
 const TYPE_LABELS = {
     'Ф': 'Федеральная',
     'Р': 'Региональная',
@@ -94,6 +88,23 @@ const TYPE_LABELS = {
     'ФИН': 'Финансовая',
     'Р/ФИН': 'Региональная/Финансовая',
     'В': 'Военная'
+};
+
+// Индексы колонок листа "База данных" — только для loadData()
+const COL = {
+    CODE: 0,
+    NUM: 1,
+    TITLE: 2,
+    DESC: 3,
+    STARS: 4,
+    EXTRA_MEASURE: 5,
+    FINE: 6,
+    ARREST: 7,
+    FELONY: 8,
+    TYPE: 9,
+    TAGS: 10,
+    FREQUENCY: 11,
+    FORUM_URL: 12
 };
 
 const CACHE_KEY = 'majestic_portland_pravovaya_baza_cache_v1';
@@ -137,11 +148,9 @@ function showStaleBanner(savedAt) {
     document.getElementById('retryStaleBtn').addEventListener('click', loadData);
 }
 
-// Общий запрос+разбор gviz-ответа Google Sheets — используется обоими загрузчиками
-// (статьи кодексов и Общая информация). Обработка ошибок и раскладка строк по
-// полям намеренно остаются в каждом загрузчике отдельно (у loadData есть офлайн-кэш
-// и баннер, у loadProceduralData — нет), сюда вынесена только общая часть
-// "получить ответ и распарсить его в массив строк".
+// ===== Загрузка данных с Google Sheets =====
+
+// Общий запрос+разбор gviz-ответа. Обработка ошибок — отдельно в каждом загрузчике.
 async function fetchGvizRows(url) {
     const response = await fetch(url);
     if (!response.ok) {
@@ -152,10 +161,7 @@ async function fetchGvizRows(url) {
     return json.table.rows;
 }
 
-// Достаёт значение ячейки gviz-таблицы по индексу: приоритет — форматированное
-// значение (f), затем сырое (v), иначе пустая строка. Общая для обоих листов
-// (статьи и ПК). Написано явными шагами вместо свёрнутого тернарника — так проще
-// увидеть порядок приоритета f -> v -> "" и не перепутать его при будущих правках.
+// Приоритет f (форматированное) -> v (сырое) -> "" — порядок важен, не менять.
 function getCellVal(cells, idx) {
     const cell = cells[idx];
     if (!cell) return "";
@@ -164,10 +170,8 @@ function getCellVal(cells, idx) {
     return "";
 }
 
-// Нормализует значение колонки "Частота" к двум состояниям: 'frequent' | 'rare'.
-// Любое значение, кроме точного "частая" (без учёта регистра и лишних пробелов),
-// считается редкой статьёй — так пустые/ещё неразмеченные строки не попадают
-// по умолчанию в компактный режим отображения.
+// Всё, кроме точного "частая", считается 'rare' — так неразмеченные строки
+// не попадают по умолчанию в compact.
 function normalizeFrequency(raw) {
     return raw.trim().toLowerCase() === 'частая' ? 'frequent' : 'rare';
 }
@@ -183,23 +187,23 @@ async function loadData() {
             const cells = row.c;
             const getVal = (idx) => getCellVal(cells, idx);
 
-            let rawCode = getVal(0).toUpperCase();
-            if (rawCode === "КОДЕКС" || !{'UK':'uk','AK':'ak','DK':'dk'}[rawCode]) return;
+            let rawCode = getVal(COL.CODE).toUpperCase();
+            if (rawCode === "КОДЕКС" || !CODE_MAP[rawCode]) return;
 
             parsedDatabase.push({
-                code: {'UK':'uk','AK':'ak','DK':'dk'}[rawCode],
-                num: getVal(1),
-                title: getVal(2) || (getVal(3).split(/[.\n]/)[0].trim() + '.'),
-                desc: getVal(3) || getVal(2),
-                stars: getVal(4),
-                extraMeasure: getVal(5),
-                fine: getVal(6),
-                arrest: getVal(7),
-                felony: getVal(8),
-                type: getVal(9),   
-                tags: getVal(10),
-                frequency: normalizeFrequency(getVal(11)),
-                forumUrl: getVal(12)
+                code: CODE_MAP[rawCode],
+                num: getVal(COL.NUM),
+                title: getVal(COL.TITLE) || (getVal(COL.DESC).split(/[.\n]/)[0].trim() + '.'),
+                desc: getVal(COL.DESC) || getVal(COL.TITLE),
+                stars: getVal(COL.STARS),
+                extraMeasure: getVal(COL.EXTRA_MEASURE),
+                fine: getVal(COL.FINE),
+                arrest: getVal(COL.ARREST),
+                felony: getVal(COL.FELONY),
+                type: getVal(COL.TYPE),   
+                tags: getVal(COL.TAGS),
+                frequency: normalizeFrequency(getVal(COL.FREQUENCY)),
+                forumUrl: getVal(COL.FORUM_URL)
             });
         });
         saveCache(parsedDatabase);
@@ -230,11 +234,9 @@ async function loadData() {
     }
 }
 
-// Загрузка данных Процессуального кодекса — отдельный лист, отдельная (упрощённая)
-// структура полей. Сознательно не смешивается с parsedDatabase/loadData, так как
-// у этого раздела совсем другой набор полей (нет штрафа/ареста/звёзд и т.д.).
-// Обработка ошибок/офлайн-кэш для этого раздела — вне рамок текущего этапа,
-// добавим при необходимости позже.
+// ===== Общая информация: загрузка данных =====
+
+// Отдельный лист, отдельная упрощённая структура полей — не смешивается с parsedDatabase.
 async function loadProceduralData() {
     try {
         const rows = await fetchGvizRows(PK_URL);
@@ -259,10 +261,9 @@ async function loadProceduralData() {
     }
 }
 
-// Загружает дату последней редакции БД с отдельного листа "Последняя редакция"
-// (A1 — заголовок "Последняя редакция", A2 — сама дата). Дата хранится и
-// показывается как обычный текст, без разбора формата — что вписано в таблицу
-// вручную, то и попадает на экран один в один.
+// ===== Дата последней редакции: загрузка и уведомление =====
+
+// Лист "Последняя редакция": A1 — заголовок, A2 — дата (вписывается вручную).
 async function loadMetaData() {
     try {
         const rows = await fetchGvizRows(META_URL);
@@ -278,12 +279,7 @@ async function loadMetaData() {
     }
 }
 
-// Обновляет подпись в панели настроек и решает, нужно ли показать тост:
-// сразу — если дата реально отличается от той, что этот браузер видел в прошлый
-// раз (первый заход сюда же — localStorage пуст, дата "новая"), либо один раз за
-// календарный день — если дата та же самая, просто как напоминание, что памятка
-// не заброшена. Не зависит от тумблера "Уведомления тумблеров": по важности этот
-// тост ближе к "Скопировано", чем к техническим тостам переключения режима/вида.
+// Тост сразу, если дата отличается от увиденной раньше; иначе не чаще раза в день.
 function notifyDbDate(dbDate) {
     document.querySelectorAll('.settings-meta-date').forEach(el => {
         el.textContent = `Последняя редакция: ${dbDate}`;
@@ -315,8 +311,8 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
-// Подсвечивает совпадения поисковых слов в уже экранированном тексте.
-// Общая логика для карточек и списка — раньше была продублирована в обеих функциях отрисовки.
+// ===== Хелперы рендера статей (общие для карточек и списка) =====
+
 function highlightMatches(text, isSearching, searchWords) {
     if (!isSearching) return text;
     let result = text;
@@ -327,8 +323,7 @@ function highlightMatches(text, isSearching, searchWords) {
     return result;
 }
 
-// Строит бейдж типа статьи (F/R и т.п.) с подсказкой-расшифровкой. Показывается только для УК.
-// Общая логика для карточек и списка — раньше была продублирована в обеих функциях отрисовки.
+// Бейдж типа статьи (Ф/Р и т.п.) с расшифровкой в title. Только для УК.
 function buildTypeBadge(article, extraClass = '') {
     if (article.code !== 'uk') return '';
     const safeType = escapeHtml(article.type);
@@ -337,30 +332,50 @@ function buildTypeBadge(article, extraClass = '') {
     return `<div class="article-type ${extraClass}" title="${escapeHtml(typeLabel)}">${safeType}</div>`;
 }
 
-// Строит инлайн-иконку-ссылку "перейти к статье на форуме" для конца текста
-// описания. href намеренно не пишется прямо в разметку (ссылка вида
-// "...#:~:text=..." может содержать спецсимволы) — вместо этого рендерится
-// пустой якорь с маркерным классом, а href проставляется отдельно через
-// element.href после вставки в DOM (см. attachForumLink). Если ссылки на
-// статью нет — возвращает '', иконка в тексте просто не появляется.
+// Кнопка закрепления (иконка-булавка). size=15 в карточках, size=14 в списке.
+function buildPinButton(article, size) {
+    const pinned = isPinned(article);
+    const label = pinned ? 'Открепить статью' : 'Закрепить статью';
+    return `<button class="pin-btn" title="${label}" aria-label="${label}" aria-pressed="${pinned}"><svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 4V11L6 15V17H18V15L15 11V4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 17V21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 4H17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>`;
+}
+
+// ВАЖНО: href не пишется прямо в разметку (в ссылке вида "#:~:text=..." могут
+// быть спецсимволы) — рендерится пустой якорь, href проставляется отдельно
+// через element.href после вставки в DOM (см. attachForumLinks).
 function buildForumLinkIcon(article) {
     if (!article.forumUrl) return '';
     return `<a class="desc-forum-link" target="_blank" rel="noopener" title="Открыть статью на форуме" aria-label="Открыть статью на форуме"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 18L18 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M8 6H18V16" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>`;
 }
 
-// Проставляет href всем иконкам-ссылкам на форум внутри переданного элемента
-// (карточка или строка). Один вызов на каждую отрисованную карточку/строку —
-// внутри неё максимум одна такая иконка (в конце описания), но querySelectorAll
-// используется на случай будущих изменений разметки, а не по необходимости сейчас.
+// Проставляет href иконкам-ссылкам на форум внутри карточки/строки — см. buildForumLinkIcon.
 function attachForumLinks(root, article) {
     root.querySelectorAll('.desc-forum-link').forEach(link => {
         link.href = article.forumUrl;
     });
 }
 
-// Показывает короткое всплывающее уведомление внизу экрана. Переиспользует один
-// и тот же DOM-элемент между вызовами, чтобы повторное копирование корректно
-// перезапускало анимацию, а не плодило уведомления одно поверх другого.
+// Общие обработчики карточки/строки: копирование номера, пин, ссылки на форум.
+// stopPropagation нужен для списка — строка целиком кликабельна (раскрытие описания).
+function attachArticleHandlers(root, article, { stopPropagation = false } = {}) {
+    const numBadge = root.querySelector('.badge-num');
+    numBadge.title = 'Скопировать номер статьи';
+    numBadge.addEventListener('click', (e) => {
+        if (stopPropagation) e.stopPropagation();
+        copyArticleNumber(article);
+    });
+
+    const pinBtn = root.querySelector('.pin-btn');
+    pinBtn.addEventListener('click', (e) => {
+        if (stopPropagation) e.stopPropagation();
+        togglePinned(article);
+    });
+
+    attachForumLinks(root, article);
+}
+
+// ===== Toast-уведомления =====
+
+// Переиспользует один DOM-элемент между вызовами.
 let toastEl = null;
 let toastHideTimer = null;
 function showToast(message) {
@@ -373,8 +388,7 @@ function showToast(message) {
 
     clearTimeout(toastHideTimer);
     toastEl.classList.remove('toast-visible');
-    // Форсируем reflow, чтобы сброс и повторное добавление класса гарантированно
-    // перезапускали CSS-переход при быстром повторном клике.
+    // Форсируем reflow — иначе CSS-переход не перезапустится при быстром повторном клике.
     void toastEl.offsetWidth;
     toastEl.classList.add('toast-visible');
 
@@ -383,8 +397,6 @@ function showToast(message) {
     }, 1800);
 }
 
-// Копирует номер статьи в формате "ст. <номер> <УК/АК/ДК>" в буфер обмена
-// и показывает уведомление об успехе.
 function copyArticleNumber(article) {
     const codeLabel = CODE_LABELS[article.code] || '';
     const text = `ст. ${article.num} ${codeLabel}`.trim();
@@ -394,17 +406,16 @@ function copyArticleNumber(article) {
         .catch(() => console.warn('Не удалось скопировать номер статьи в буфер обмена'));
 }
 
+// ===== Основной рендер =====
+
 function renderArticles() {
     const container = document.getElementById('articlesContainer');
 
     const filterText = document.getElementById('searchInput').value.toLowerCase().trim();
     const isSearching = filterText.length > 0;
 
-    // Общая информация — отдельный тип контента, без плиток/списка и своей
-    // логикой рендера. Но пока идёт поиск (в том числе начатый на этой вкладке),
-    // показываем не карточки ПК, а обычные результаты по УК/АК/ДК — так же, как
-    // при поиске с любой другой вкладки. proceduralData в эту выдачу не попадает,
-    // так как поиск ниже работает только по parsedDatabase.
+    // При активном поиске ПК не рендерится отдельно — показываются обычные
+    // результаты по УК/АК/ДК, как с любой другой вкладки.
     if (currentCode === 'pk' && !isSearching) {
         container.className = '';
         renderProceduralCards(container);
@@ -427,25 +438,20 @@ function renderArticles() {
         if (isSearching) {
             const searchableText = `${article.num} ${article.title} ${article.desc} ${article.tags}`.toLowerCase();
             
-            // Теперь считаем сколько слов из запроса нашлось в тексте
             searchWords.forEach(word => {
                 if (searchableText.includes(word)) {
                     matchScore += 1;
                 }
             });
 
-            // Если не нашлось ни одного слова — игнорируем
             if (matchScore === 0) return;
         }
 
         matchedArticles.push({ article, matchScore });
     });
 
-    // Вне поиска — закреплённые статьи поднимаются в начало (внутри своего режима
-    // отображения: закрепление внутри compact "видит" только частые статьи, так
-    // как редкие уже отфильтрованы выше), остальной порядок не меняется благодаря
-    // стабильной сортировке. При активном поиске закрепление игнорируется —
-    // работает только сортировка по релевантности.
+    // Вне поиска — закреплённые статьи первыми (сортировка стабильна).
+    // При поиске пины игнорируются, работает только релевантность.
     matchedArticles.sort((a, b) => {
         if (isSearching) return b.matchScore - a.matchScore;
         return (isPinned(b.article) ? 1 : 0) - (isPinned(a.article) ? 1 : 0);
@@ -466,17 +472,11 @@ function renderArticles() {
     }
 }
 
-// Определяет, есть ли у статьи признак судимости по тексту поля "felony".
-// Общая логика для карточек и списка — раньше проверка была продублирована:
-// один раз инлайн прямо в шаблонной строке карточки, второй раз отдельной
-// переменной в списке — с риском разойтись при будущей правке критерия.
 function hasFelonyRecord(article) {
     return article.felony.toLowerCase().includes('судимость');
 }
 
-// Склоняет слово "звезда" по числу (1 звезда / 2-4 звезды / 5+ звёзд) с учётом
-// исключений на 11-14. Считает количество звёзд по длине строки article.stars
-// (значение хранится как повторяющиеся символы "★").
+// Склонение "звезда/звезды/звёзд" с учётом исключений 11-14.
 function pluralizeStars(count) {
     const mod10 = count % 10;
     const mod100 = count % 100;
@@ -491,9 +491,6 @@ function starsTitle(article) {
     return `${count} ${pluralizeStars(count)}`;
 }
 
-// Готовит подсвеченные (уже экранированные) поля статьи — заголовок, номер,
-// описание. Общая логика для карточек и списка: раньше этот блок был дословно
-// продублирован в начале renderAsCards и renderAsList.
 function buildHighlightedFields(article, isSearching, searchWords) {
     return {
         title: highlightMatches(escapeHtml(article.title), isSearching, searchWords),
@@ -502,8 +499,9 @@ function buildHighlightedFields(article, isSearching, searchWords) {
     };
 }
 
-// Отрисовка в виде плиток (карточек). Логика фильтрации/поиска/сортировки уже
-// выполнена в renderArticles() — эта функция отвечает только за разметку.
+// ===== Отрисовка: карточки =====
+
+// Фильтрация/поиск/сортировка уже выполнены в renderArticles() — здесь только разметка.
 function renderAsCards(container, matchedArticles, isSearching, searchWords) {
     matchedArticles.forEach(item => {
         const article = item.article;
@@ -525,7 +523,7 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
         card.innerHTML = `
             <div class="card-header">
                 <div class="title-row">
-                    <button class="pin-btn" title="${isPinned(article) ? 'Открепить статью' : 'Закрепить статью'}" aria-label="${isPinned(article) ? 'Открепить статью' : 'Закрепить статью'}" aria-pressed="${isPinned(article)}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 4V11L6 15V17H18V15L15 11V4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 17V21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 4H17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+                    ${buildPinButton(article, 15)}
                     <div class="title">${highlightedTitle}</div>
                 </div>
                 <div class="card-header-right">${typeHtml}<div class="badge-num">ст. ${highlightedNum}</div></div>
@@ -540,22 +538,16 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
             <div class="desc">${highlightedDesc}${buildForumLinkIcon(article)}</div>
         `;
 
-        const numBadge = card.querySelector('.badge-num');
-        numBadge.title = 'Скопировать номер статьи';
-        numBadge.addEventListener('click', () => copyArticleNumber(article));
-
-        const pinBtn = card.querySelector('.pin-btn');
-        pinBtn.addEventListener('click', () => togglePinned(article));
-
-        attachForumLinks(card, article);
+        attachArticleHandlers(card, article);
 
         container.appendChild(card);
     });
 }
 
-// Отрисовка в виде компактного списка (строк). Логика фильтрации/поиска/сортировки уже
-// выполнена в renderArticles() — эта функция отвечает только за разметку.
-// Каждая строка кликабельна: раскрывает/скрывает блок с полным описанием статьи.
+// ===== Отрисовка: список =====
+
+// Фильтрация/поиск/сортировка уже выполнены в renderArticles(). Строка кликабельна —
+// раскрывает/скрывает полное описание.
 function renderAsList(container, matchedArticles, isSearching, searchWords) {
     matchedArticles.forEach(item => {
         const article = item.article;
@@ -568,18 +560,14 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
 
         const typeHtml = buildTypeBadge(article, 'row-slot-type');
 
-        // Левая часть строки: тип (только УК), номер статьи и заголовок.
-        // row-slot-type/row-slot-num имеют фиксированную ширину, поэтому заголовок
-        // всегда начинается в одной и той же позиции, независимо от длины тега типа/номера.
+        // row-slot-* — фиксированная ширина, заголовок начинается в одной позиции.
         const leftHtml = `
             ${typeHtml}
             <div class="badge-num row-num row-slot-num">ст. ${highlightedNum}</div>
-            <div class="row-title"><button class="pin-btn" title="${isPinned(article) ? 'Открепить статью' : 'Закрепить статью'}" aria-label="${isPinned(article) ? 'Открепить статью' : 'Закрепить статью'}" aria-pressed="${isPinned(article)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 4V11L6 15V17H18V15L15 11V4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 17V21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 4H17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>${highlightedTitle}</div>
+            <div class="row-title">${buildPinButton(article, 14)}${highlightedTitle}</div>
         `;
 
-        // Правая часть строки: для УК — звёзды/штраф/арест (арест краснеет при судимости),
-        // для АК и ДК — доп. мера/штраф. Каждый параметр всегда занимает свой слот
-        // фиксированной ширины (row-slot-*), чтобы колонки не "гуляли".
+        // УК — звёзды/штраф/арест; АК и ДК — доп. мера/штраф. row-slot-* держат ширину.
         let rightHtml = '';
         if (article.code === 'uk') {
             const safeStars = escapeHtml(article.stars);
@@ -621,20 +609,7 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
             </div>
         `;
 
-        const numBadge = row.querySelector('.badge-num');
-        numBadge.title = 'Скопировать номер статьи';
-        numBadge.addEventListener('click', (e) => {
-            e.stopPropagation();
-            copyArticleNumber(article);
-        });
-
-        const pinBtn = row.querySelector('.pin-btn');
-        pinBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            togglePinned(article);
-        });
-
-        attachForumLinks(row, article);
+        attachArticleHandlers(row, article, { stopPropagation: true });
 
         const header = row.querySelector('.row-header');
         const toggleExpanded = () => {
@@ -656,8 +631,7 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
 }
 
 // ===== Общая информация: диспетчер шаблонов =====
-// Каждая карточка сама решает, каким шаблоном рендериться (поле "Тип" из таблицы).
-// "text" и "table" пока не реализованы — не встречались в реальном контенте, добавим по необходимости.
+// "text" и "table" пока не реализованы — добавим по необходимости.
 const PK_TEMPLATES = {
     steps: renderPkSteps,
     list: renderPkList,
@@ -676,9 +650,7 @@ function renderPkList(content) {
     return `<ul class="pk-list">${items}</ul>`;
 }
 
-// Safe-fallback: используется и для типов, для которых ещё не написан шаблон
-// (сейчас это "text"), и для опечаток/неизвестных значений в колонке "Тип" —
-// карточка не "теряется" молча, а просто показывается обычным текстом.
+// Safe-fallback для "text" и неизвестных значений — карточка не теряется молча.
 function renderPkFallback(content) {
     return `<p>${escapeHtml(content).replace(/\n/g, '<br>')}</p>`;
 }
@@ -723,6 +695,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click
     renderArticles();
 }));
 
+// ===== Переключатели: режим отображения и вид =====
+
 function syncModeToggleUI() {
     document.querySelectorAll('.mode-btn').forEach(btn => {
         const isActive = btn.getAttribute('data-mode') === currentDisplayMode;
@@ -731,8 +705,6 @@ function syncModeToggleUI() {
     });
 }
 
-// Короткие описания сути режима — показываются во всплывающем уведомлении
-// при переключении тумблера, чтобы пользователь понимал, что именно изменилось.
 const DISPLAY_MODE_TOAST = {
     compact: 'Основные статьи',
     full: 'Все статьи'
@@ -758,8 +730,6 @@ function syncViewToggleUI() {
     });
 }
 
-// Короткие описания сути вида отображения — та же логика, что и для
-// DISPLAY_MODE_TOAST выше.
 const VIEW_TOAST = {
     grid: 'Вид: плитки',
     list: 'Вид: список'
