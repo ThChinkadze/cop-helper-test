@@ -309,7 +309,7 @@ body {
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
-    width: 240px;
+    width: 280px;
     max-width: calc(100vw - 40px);
     box-sizing: border-box;
     background-color: var(--card-bg);
