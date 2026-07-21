@@ -1019,9 +1019,6 @@ body {
 }
 
 .modal-body {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
     margin-bottom: 22px;
 }
 
@@ -1029,7 +1026,7 @@ body {
     margin: 0;
     font-size: 13.5px;
     color: var(--text-muted);
-    line-height: 1.6;
+    line-height: 1.65;
 }
 
 .modal-confirm-btn {
