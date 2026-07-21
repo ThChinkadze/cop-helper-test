@@ -255,6 +255,7 @@ body {
     align-items: center;
     justify-content: center;
     width: 40px;
+    height: 32px;
     padding: 0;
     background-color: transparent;
     color: #8e8e93;
@@ -393,6 +394,10 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+}
+
+.settings-row + .settings-row {
+    margin-top: 14px;
 }
 
 .settings-row-label {
