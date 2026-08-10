@@ -243,7 +243,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
+    width: 48px;
     height: 100%;
     padding: 0;
     background-color: var(--control-bg);
