@@ -90,20 +90,6 @@ const TYPE_LABELS = {
     'В': 'Военная'
 };
 
-// ===== Веса релевантности поиска =====
-// Чем выше вес — тем сильнее совпадение поднимает статью в выдаче.
-// SUBSTRING — подстраховочный вес для случая, когда слово запроса нашлось
-// только как часть другого слова (не отдельным токеном) — раньше это был
-// единственный механизм поиска, теперь это самый слабый сигнал.
-const SEARCH_WEIGHT = {
-    NUM_EXACT: 50,
-    TITLE_TOKEN: 8,
-    FULL_QUERY_TAG_MATCH: 25,
-    TAG_TOKEN: 4,
-    DESC_TOKEN: 2,
-    SUBSTRING: 1
-};
-
 // Индексы колонок листа "База данных" — только для loadData()
 const COL = {
     CODE: 0,
@@ -204,32 +190,18 @@ async function loadData() {
             let rawCode = getVal(COL.CODE).toUpperCase();
             if (rawCode === "КОДЕКС" || !CODE_MAP[rawCode]) return;
 
-            const titleVal = getVal(COL.TITLE) || (getVal(COL.DESC).split(/[.\n]/)[0].trim() + '.');
-            const descVal = getVal(COL.DESC) || getVal(COL.TITLE);
-            const tagsVal = getVal(COL.TAGS);
-            // Теги — список фраз через запятую (напр. "права, водительское удостоверение, ...").
-            // Разбираем один раз при загрузке, чтобы не токенизировать на каждое нажатие клавиши.
-            const tagsListVal = tagsVal.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
-            // Плоский список слов из всех тегов — для поиска отдельного слова
-            // запроса внутри любой тег-фразы без повторной токенизации на рендере.
-            const tagsTokensVal = tagsListVal.flatMap(t => tokenize(t));
-
             parsedDatabase.push({
                 code: CODE_MAP[rawCode],
                 num: getVal(COL.NUM),
-                title: titleVal,
-                desc: descVal,
+                title: getVal(COL.TITLE) || (getVal(COL.DESC).split(/[.\n]/)[0].trim() + '.'),
+                desc: getVal(COL.DESC) || getVal(COL.TITLE),
                 stars: getVal(COL.STARS),
                 extraMeasure: getVal(COL.EXTRA_MEASURE),
                 fine: getVal(COL.FINE),
                 arrest: getVal(COL.ARREST),
                 felony: getVal(COL.FELONY),
                 type: getVal(COL.TYPE),   
-                tags: tagsVal,
-                tagsList: tagsListVal,
-                tagsTokens: tagsTokensVal,
-                titleTokens: tokenize(titleVal),
-                descTokens: tokenize(descVal),
+                tags: getVal(COL.TAGS),
                 frequency: normalizeFrequency(getVal(COL.FREQUENCY)),
                 forumUrl: getVal(COL.FORUM_URL)
             });
@@ -327,64 +299,6 @@ function notifyDbDate(dbDate) {
         localStorage.setItem(DB_DATE_TOAST_DAY_KEY, today);
         showToast(`Последняя редакция: ${dbDate}`);
     }
-}
-
-// Разбивает текст на слова-токены в нижнем регистре. Разделитель — всё,
-// что не буква (кириллица/латиница) и не цифра. Не используем regex \b —
-// он не понимает границы слов в кириллице ("\w" не включает рус. буквы).
-function tokenize(text) {
-    if (!text) return [];
-    return text.toLowerCase().split(/[^a-zа-яё0-9]+/i).filter(Boolean);
-}
-
-// Взвешенный скоринг релевантности статьи под текущий запрос.
-// filterText — весь запрос целиком (уже trim+lowerCase), searchWords — его слова.
-function scoreArticleMatch(article, filterText, searchWords) {
-    let score = 0;
-
-    // Сильный сигнал: весь запрос целиком совпадает с одним тегом статьи
-    // (напр. запрос "водительское удостоверение" == тег "водительское удостоверение").
-    if (article.tagsList.includes(filterText)) {
-        score += SEARCH_WEIGHT.FULL_QUERY_TAG_MATCH;
-    }
-
-    // Полный текст статьи для подстраховочного подстрочного поиска —
-    // считаем один раз на статью, а не на каждое слово запроса.
-    let fullTextLower = null;
-
-    searchWords.forEach(word => {
-        let wordMatched = false;
-
-        if (article.num.toLowerCase() === word) {
-            score += SEARCH_WEIGHT.NUM_EXACT;
-            wordMatched = true;
-        }
-        if (article.titleTokens.includes(word)) {
-            score += SEARCH_WEIGHT.TITLE_TOKEN;
-            wordMatched = true;
-        }
-        if (article.tagsTokens.includes(word)) {
-            score += SEARCH_WEIGHT.TAG_TOKEN;
-            wordMatched = true;
-        }
-        if (article.descTokens.includes(word)) {
-            score += SEARCH_WEIGHT.DESC_TOKEN;
-            wordMatched = true;
-        }
-
-        if (!wordMatched) {
-            // Ни в одном поле слово не нашлось как отдельный токен — подстраховка
-            // подстрокой (опечатки, окончания слов, частичные совпадения).
-            if (fullTextLower === null) {
-                fullTextLower = `${article.num} ${article.title} ${article.desc} ${article.tags}`.toLowerCase();
-            }
-            if (fullTextLower.includes(word)) {
-                score += SEARCH_WEIGHT.SUBSTRING;
-            }
-        }
-    });
-
-    return score;
 }
 
 function escapeRegex(str) {
@@ -522,7 +436,13 @@ function renderArticles() {
         let matchScore = 0;
 
         if (isSearching) {
-            matchScore = scoreArticleMatch(article, filterText, searchWords);
+            const searchableText = `${article.num} ${article.title} ${article.desc} ${article.tags}`.toLowerCase();
+            
+            searchWords.forEach(word => {
+                if (searchableText.includes(word)) {
+                    matchScore += 1;
+                }
+            });
 
             if (matchScore === 0) return;
         }
