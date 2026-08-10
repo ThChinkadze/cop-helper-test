@@ -524,7 +524,7 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
             <div class="card-header">
                 <div class="title-row">
                     ${buildPinButton(article, 15)}
-                    <div class="title">${highlightedTitle}</div>
+                    <div class="title" title="${escapeHtml(article.title)}">${highlightedTitle}</div>
                 </div>
                 <div class="card-header-right">${typeHtml}<div class="badge-num">ст. ${highlightedNum}</div></div>
             </div>
@@ -563,8 +563,8 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
         // row-slot-* — фиксированная ширина, заголовок начинается в одной позиции.
         const leftHtml = `
             ${typeHtml}
-            <div class="badge-num row-num row-slot-num">ст. ${highlightedNum}</div>
-            <div class="row-title">${buildPinButton(article, 14)}${highlightedTitle}</div>
+            <div class="badge-num row-num row-slot-num" title="ст. ${escapeHtml(article.num)}">ст. ${highlightedNum}</div>
+            <div class="row-title" title="${escapeHtml(article.title)}">${buildPinButton(article, 14)}${highlightedTitle}</div>
         `;
 
         // УК — звёзды/штраф/арест; АК и ДК — доп. мера/штраф. row-slot-* держат ширину.
@@ -674,7 +674,7 @@ function renderProceduralCards(container) {
 
         card.innerHTML = `
             <div class="card-header">
-                <div class="title">${escapeHtml(item.title)}</div>
+                <div class="title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
             </div>
             <div class="pk-body">${renderProceduralCardBody(item)}</div>
         `;
