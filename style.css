@@ -205,9 +205,10 @@ body {
     flex-shrink: 0;
     gap: 4px;
     background-color: var(--control-bg);
+    border: 1px solid var(--control-border);
     border-radius: 8px;
     padding: 4px;
-    box-shadow: var(--control-shadow);
+    box-sizing: border-box;
 }
 
 .mode-btn {
@@ -215,6 +216,7 @@ body {
     align-items: center;
     justify-content: center;
     width: 40px;
+    height: 32px;
     padding: 0;
     background-color: transparent;
     color: var(--text-muted);
