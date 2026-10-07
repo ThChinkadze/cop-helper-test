@@ -20,6 +20,8 @@
     --surface-alt: #262628;
     --divider: #252525;
     --text-muted: #8e8e93;
+    --text-faint: #636366;
+    --text-bright: #e2e2e6;
 }
 
 /* Тонкий скроллбар в цвет темы — для всей страницы и любого блока с прокруткой */
@@ -61,10 +63,14 @@ body {
     align-items: center; 
 }
 
+/* Фон шапки непрозрачный и по ширине равен списку (1300px), содержимое — 1100px.
+   Нижние 30px фона плавно растворяются — список уходит под шапку без резкой границы. */
 .controls-container { 
-    width: 100%; max-width: 1100px; 
+    width: 100%; max-width: 1300px; 
+    box-sizing: border-box;
     position: sticky; top: 0; z-index: 100; 
-    padding-top: 10px; padding-bottom: 20px; 
+    padding: 10px max(0px, calc((min(100%, 1300px) - 1100px) / 2)) 30px;
+    background-image: linear-gradient(to bottom, var(--bg-color) calc(100% - 30px), rgba(20, 20, 20, 0) 100%);
 }
 
 .search-wrapper {
@@ -74,7 +80,7 @@ body {
 
 #searchInput { 
     width: 100%; 
-    padding: 16px 48px 16px 20px; 
+    padding: 16px 88px 16px 20px;
     font-size: 18px; 
     font-family: 'Nunito', sans-serif; 
     background-color: var(--control-bg); 
@@ -111,8 +117,36 @@ body {
     transform: translateY(-50%) scale(1.15);
 }
 
-.tabs { 
-    display: flex; 
+.search-clear {
+    position: absolute;
+    right: 46px;
+    top: 50%;
+    padding: 10px;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-main);
+    opacity: 0;
+    pointer-events: none;
+    transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.search-clear.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.search-clear:hover,
+.search-clear:focus-visible {
+    color: var(--accent);
+}
+
+.tabs {
+    display: flex;
     gap: 10px; 
     width: 100%; 
     padding-bottom: 5px; 
@@ -136,12 +170,18 @@ body {
 
 .tab-btn:hover { 
     background-color: var(--control-border); 
-    color: #fff; 
+    color: var(--text-title); 
 }
 
-.tab-btn.active { 
-    background-color: var(--accent); 
-    color: var(--text-title); 
+.tab-btn.active {
+    background-color: var(--accent);
+    color: var(--text-title);
+}
+
+/* Во время поиска по всем кодексам активная вкладка приглушена */
+.tabs.searching .tab-btn.active {
+    background-color: #0b4a75;
+    color: #a9bfcd;
 }
 
 .retry-btn {
@@ -162,42 +202,7 @@ body {
     padding-bottom: 0;
 }
 
-.mode-toggle {
-    display: flex;
-    flex-shrink: 0;
-    gap: 4px;
-    background-color: var(--control-bg);
-    border: 1px solid var(--control-border);
-    border-radius: 8px;
-    padding: 4px;
-    box-sizing: border-box;
-}
-
-.mode-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 28px;
-    padding: 0;
-    background-color: transparent;
-    color: var(--text-muted);
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.mode-btn:hover {
-    background-color: var(--control-border);
-    color: #fff;
-}
-
-.mode-btn.active {
-    background-color: var(--accent);
-    color: var(--text-title);
-}
-
+.mode-toggle,
 .view-toggle {
     display: flex;
     flex-shrink: 0;
@@ -209,6 +214,7 @@ body {
     box-sizing: border-box;
 }
 
+.mode-btn,
 .view-btn {
     display: flex;
     align-items: center;
@@ -224,11 +230,13 @@ body {
     transition: all 0.2s ease;
 }
 
+.mode-btn:hover,
 .view-btn:hover {
     background-color: var(--control-border);
-    color: #fff;
+    color: var(--text-title);
 }
 
+.mode-btn.active,
 .view-btn.active {
     background-color: var(--accent);
     color: var(--text-title);
@@ -257,7 +265,7 @@ body {
 
 .settings-btn:hover {
     background-color: var(--control-border);
-    color: #fff;
+    color: var(--text-title);
 }
 
 .settings-btn[aria-expanded="true"] {
@@ -342,18 +350,12 @@ body {
     background-color: var(--control-border);
 }
 
-/* Общий паттерн: подпись слева, контрол справа. Отступы — через gap на .settings-panel.
-   .wide (пока не используется) — подпись сверху, контрол на всю ширину. */
+/* Общий паттерн: подпись слева, контрол справа. Отступы — через gap на .settings-panel. */
 .settings-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-}
-
-.settings-item.wide {
-    flex-direction: column;
-    align-items: stretch;
 }
 
 .settings-item-label {
@@ -362,65 +364,11 @@ body {
     color: var(--text-title);
 }
 
-.settings-meta-date {
-    text-align: center;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-main);
-}
-
-.switch {
-    position: relative;
-    display: inline-block;
-    width: 40px;
-    height: 22px;
-    flex-shrink: 0;
-}
-
-.switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.switch-slider {
-    position: absolute;
-    inset: 0;
-    background-color: var(--control-bg);
-    border: 1px solid var(--control-border);
-    border-radius: 22px;
-    cursor: pointer;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.switch-slider::before {
-    content: "";
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    left: 2px;
-    top: 2px;
-    background-color: #e2e2e6;
-    border-radius: 50%;
-    transition: transform 0.15s ease;
-}
-
-.switch input:checked + .switch-slider {
-    background-color: var(--accent);
-    border-color: var(--accent);
-}
-
-.switch input:checked + .switch-slider::before {
-    transform: translateX(18px);
-    background-color: #ffffff;
-}
-
 #articlesContainer { 
     display: grid; 
     grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr)); 
     gap: 20px; 
     width: 100%; max-width: 1300px; 
-    margin-top: 10px; 
 }
 
 .card { 
@@ -552,9 +500,8 @@ body {
     color: var(--text-title); 
     line-height: 1.3; 
     margin: 0; 
-    display: 
-    -webkit-box; 
-    -webkit-line-clamp: 2; 
+    display: -webkit-box;
+-webkit-line-clamp: 2; 
     -webkit-box-orient: vertical; 
     overflow: hidden; 
     min-width: 0;
@@ -578,8 +525,10 @@ body {
 }
 
 .row-title .pin-btn {
-    margin-top: 0;
-    margin-right: 6px;
+    position: absolute;
+    left: 0;
+    top: 0.16em;
+    margin: 0;
 }
 
 .pin-btn:hover {
@@ -596,7 +545,7 @@ body {
 .badge-num { 
     font-size: 13px; 
     font-weight: 700; 
-    color: #e2e2e6; 
+    color: var(--text-bright); 
     background-color: var(--control-bg); 
     padding: 4px 10px; 
     border-radius: 6px; 
@@ -609,7 +558,7 @@ body {
 .badge-num:hover {
     background-color: var(--accent);
     border-color: var(--accent);
-    color: #ffffff;
+    color: var(--text-title);
 }
 
 .toast {
@@ -618,7 +567,7 @@ body {
     bottom: 32px;
     transform: translate(-50%, 12px);
     background-color: var(--control-bg);
-    color: #e2e2e6;
+    color: var(--text-bright);
     font-size: 13px;
     font-weight: 700;
     padding: 10px 18px;
@@ -707,7 +656,7 @@ body {
 .article-type { 
     font-size: 11px; 
     font-weight: 800; 
-    color: #636366; 
+    color: #7d7d82; 
     background-color: transparent;
     border: 1px solid var(--control-border);
     padding: 3px 6px;
@@ -718,11 +667,15 @@ body {
     text-align: center;
 }
 
+/* Плашка кодекса в результатах поиска: тот же вид, цвет кодекса */
+.article-code.uk { color: var(--uk-color); border-color: var(--uk-color); }
+.article-code.ak { color: var(--ak-color); border-color: var(--ak-color); }
+.article-code.dk { color: var(--dk-color); border-color: var(--dk-color); }
+
 .stale-banner {
     width: 100%;
     box-sizing: border-box;
-    margin-top: -5px;
-    margin-bottom: 15px;
+    margin-top: 15px;
     padding: 12px 16px;
     background-color: rgba(255, 149, 0, 0.12);
     border: 1px solid var(--ak-color);
@@ -800,7 +753,7 @@ body {
 .row.dk { border-left: 6px solid var(--dk-color); }
 
 .row-chevron {
-    color: #636366;
+    color: var(--text-faint);
     flex-shrink: 0;
     transition: transform 0.2s ease;
 }
@@ -849,13 +802,14 @@ body {
     text-overflow: ellipsis;
 }
 
+/* Длинное название переносится на следующую строку; булавка стоит слева от первой строки */
 .row-title {
+    position: relative;
+    padding-left: 24px;
     font-size: 15px;
     font-weight: 800;
     color: var(--text-title);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
     min-width: 0;
 }
 
@@ -894,12 +848,28 @@ body {
 }
 
 /* Фиксированная ширина — параметры всегда стоят в одной позиции */
+.row-slot-code   { width: 36px; flex-shrink: 0; }
 .row-slot-type   { width: 54px; flex-shrink: 0; }
 .row-slot-num    { width: 112px; }
-.row-slot-stars  { width: 88px; }
-.row-slot-fine   { width: 168px; }
+.row-slot-stars  { width: 96px; }
+.row-slot-fine   { width: 172px; }
 .row-slot-arrest { width: 140px; }
 .row-slot-extra  { width: 168px; }
+
+/* Диапазон звёзд («★★★–★★★★») длиннее обычного значения — поля у плашки уже */
+.row-stars-range {
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+/* Звёзды и арест у статьи АК или ДК занимают место доп. меры и прижаты к штрафу */
+.row-slot-holder {
+    min-width: 168px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
+}
 
 /* Скрывает содержимое, но сохраняет ширину слота — соседние колонки не сдвигаются */
 .row-hidden {
@@ -979,12 +949,149 @@ body {
 
 .footer-btn:hover {
     background-color: var(--control-border);
-    color: #fff;
+    color: var(--text-title);
 }
 
 .footer-signature {
     font-size: 12px;
     font-weight: 600;
-    color: #636366;
+    color: var(--text-faint);
     letter-spacing: 0.2px;
+}
+
+.footer-meta-date {
+    margin-top: -8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-faint);
+    letter-spacing: 0.2px;
+}
+
+.footer-meta-date:empty {
+    display: none;
+}
+
+/* ===== Адаптив под ширину окна =====
+   Правила привязаны к ширине шапки и списка, а не окна — так учитывается масштаб из настроек. */
+
+.controls-container {
+    container-type: inline-size;
+    container-name: header;
+}
+
+#articlesContainer {
+    container-type: inline-size;
+    container-name: list;
+}
+
+#searchInput {
+    text-overflow: ellipsis;
+}
+
+.tab-short {
+    display: none;
+}
+
+/* Вкладки остаются равной ширины: шрифт плавно уменьшается с 15 до 13px */
+.tabs .tab-btn {
+    font-size: clamp(13px, calc((100cqw - 200px) / 55), 15px);
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+@container header (max-width: 959px) {
+    .tab-full { display: none; }
+    .tab-short { display: inline; }
+    .tabs .tab-btn { font-size: 15px; }
+}
+
+/* Узкий список: наказания уходят второй строкой под название и выровнены по его тексту */
+@container list (max-width: 959px) {
+    .row-header {
+        display: grid;
+        grid-template-columns: auto auto auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px 0;
+    }
+
+    .row-left { display: contents; }
+
+    .row-slot-code {
+        grid-area: 1 / 1;
+        margin-right: 10px;
+    }
+
+    .row-slot-type {
+        grid-area: 1 / 2;
+        margin-right: 10px;
+    }
+
+    .row-num {
+        grid-area: 1 / 3;
+        margin-right: 10px;
+    }
+
+    .row-title { grid-area: 1 / 4; }
+
+    .row-chevron {
+        grid-area: 1 / 5;
+        margin-left: 12px;
+    }
+
+    .row-right {
+        grid-area: 2 / 4 / 3 / -1;
+        padding-left: 24px;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    /* Доп. мера идёт после штрафа и показывается целиком, пока хватает ширины */
+    .row-slot-extra {
+        order: 2;
+        width: auto;
+        max-width: 100%;
+        flex-shrink: 1;
+        min-width: 0;
+    }
+
+    /* Звёзды и арест АК и ДК идут после штрафа и переносятся по одной плашке, как у УК */
+    .row-slot-holder { display: contents; }
+    .row-slot-holder > .row-tag { order: 2; }
+
+    .row-right .row-hidden { display: none; }
+}
+
+/* Ещё уже: строка наказаний начинается от левого края строки */
+@container list (max-width: 679px) {
+    .row-right {
+        grid-column: 1 / -1;
+        padding-left: 0;
+    }
+}
+
+/* Очень узкий список: номер, название и наказания идут друг под другом */
+@container list (max-width: 559px) {
+    .row-header { padding: 10px 12px; }
+
+    .row-title { grid-area: 2 / 1 / 3 / -1; }
+    .row-right { grid-row: 3; }
+}
+
+@container list (max-width: 459px) {
+    .row-slot-fine,
+    .row-slot-stars,
+    .row-slot-arrest {
+        width: auto;
+        max-width: 100%;
+        flex-shrink: 1;
+        min-width: 0;
+    }
+
+    .row-slot-extra {
+        white-space: normal;
+        text-align: left;
+    }
+}
+
+@media (max-width: 640px) {
+    body { padding: 12px; }
 }

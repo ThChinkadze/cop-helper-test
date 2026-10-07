@@ -1,13 +1,15 @@
+// ===== Настройки сервера =====
+const SHEET_ID = '1y4PKeW4sTxnQhJJ7nlO2coCZPdRbUKjC28KQkpMidrs';
+const STORAGE_PREFIX = 'majestic_orlando_';
+
 // ===== Настройки Google Sheets =====
-const SHEET_ID = '1ECGNHLbqR8KuPV_QH1E0SO8mGUOm4WIYP-hWWR5PZ-U'; 
-const SHEET_NAME = encodeURIComponent('База данных'); 
-const TIMEOUT_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}&headers=0`;
+function sheetUrl(sheetName) {
+    return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}&headers=0`;
+}
 
-const SHEET_NAME_PK = encodeURIComponent('Общая информация');
-const PK_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME_PK}&headers=0`;
-
-const SHEET_NAME_META = encodeURIComponent('Последняя редакция');
-const META_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME_META}&headers=0`;
+const DATA_URL = sheetUrl('База данных');
+const PK_URL = sheetUrl('Общая информация');
+const META_URL = sheetUrl('Последняя редакция');
 
 // ===== Состояние приложения =====
 let parsedDatabase = [];
@@ -16,14 +18,14 @@ let currentCode = "uk";
 let searchDebounceTimer;
 
 // ===== Вид отображения (плитки/список) =====
-const VIEW_KEY = 'majestic_portland_view_mode';
+const VIEW_KEY = STORAGE_PREFIX + 'view_mode';
 let currentView = localStorage.getItem(VIEW_KEY) === 'grid' ? 'grid' : 'list';
 
 // ===== Режим отображения (compact/full) =====
-const DISPLAY_MODE_KEY = 'majestic_portland_display_mode';
+const DISPLAY_MODE_KEY = STORAGE_PREFIX + 'display_mode';
 let currentDisplayMode = localStorage.getItem(DISPLAY_MODE_KEY) === 'full' ? 'full' : 'compact';
 
-const ZOOM_KEY = 'majestic_portland_zoom_level';
+const ZOOM_KEY = STORAGE_PREFIX + 'zoom_level';
 const ZOOM_MIN = 75;
 const ZOOM_MAX = 130;
 const ZOOM_STEP = 5;
@@ -33,15 +35,10 @@ let currentZoom = (Number.isInteger(storedZoom) && storedZoom >= ZOOM_MIN && sto
     : 100;
 
 // ===== Дата последней редакции =====
-const DB_DATE_SEEN_KEY = 'majestic_portland_db_date_seen';
-const DB_DATE_TOAST_DAY_KEY = 'majestic_portland_db_date_toast_day';
-
-// ===== Уведомления тумблеров =====
-const NOTIFICATIONS_KEY = 'majestic_portland_toggle_notifications';
-let toggleNotificationsEnabled = localStorage.getItem(NOTIFICATIONS_KEY) !== 'false';
+const DB_DATE_SEEN_KEY = STORAGE_PREFIX + 'db_date_seen';
 
 // ===== Пины статей =====
-const PINNED_KEY = 'majestic_portland_pinned_articles';
+const PINNED_KEY = STORAGE_PREFIX + 'pinned_articles';
 let pinnedArticles = new Set(loadPinnedArticles());
 
 function loadPinnedArticles() {
@@ -69,8 +66,14 @@ function togglePinned(article) {
         pinnedArticles.add(id);
     }
     localStorage.setItem(PINNED_KEY, JSON.stringify([...pinnedArticles]));
-    renderArticles();
+    renderArticles({ keepExpanded: true });
 }
+
+const CODE_NAMES = {
+    'uk': 'Уголовный кодекс',
+    'ak': 'Административный кодекс',
+    'dk': 'Дорожный кодекс'
+};
 
 const CODE_LABELS = {
     'uk': 'УК',
@@ -106,19 +109,21 @@ const COL = {
     FREQUENCY: 11
 };
 
-const CACHE_KEY = 'majestic_portland_pravovaya_baza_cache_v1';
+// ===== Локальный кэш данных =====
+const CACHE_KEY = STORAGE_PREFIX + 'pravovaya_baza_cache_v1';
+const PK_CACHE_KEY = STORAGE_PREFIX + 'pk_cache_v1';
 
-function saveCache(data) {
+function saveCache(key, data) {
     try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ data, savedAt: Date.now() }));
+        localStorage.setItem(key, JSON.stringify({ data, savedAt: Date.now() }));
     } catch (e) {
         console.warn('Не удалось сохранить локальный кэш данных', e);
     }
 }
 
-function loadCache() {
+function loadCache(key) {
     try {
-        const raw = localStorage.getItem(CACHE_KEY);
+        const raw = localStorage.getItem(key);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         if (!parsed || !Array.isArray(parsed.data)) return null;
@@ -128,13 +133,21 @@ function loadCache() {
     }
 }
 
+// ===== Баннер устаревших данных =====
+
+// Источник данных -> время сохранения показанной копии.
+const staleSources = new Map();
+
 function removeStaleBanner() {
     const banner = document.getElementById('staleDataBanner');
     if (banner) banner.remove();
 }
 
-function showStaleBanner(savedAt) {
+function updateStaleBanner() {
     removeStaleBanner();
+    if (staleSources.size === 0) return;
+
+    const savedAt = Math.min(...staleSources.values());
     const dateStr = new Date(savedAt).toLocaleString('ru-RU');
     const banner = document.createElement('div');
     banner.id = 'staleDataBanner';
@@ -144,20 +157,75 @@ function showStaleBanner(savedAt) {
         <button id="retryStaleBtn">Обновить</button>
     `;
     document.querySelector('.controls-container').appendChild(banner);
-    document.getElementById('retryStaleBtn').addEventListener('click', loadData);
+    document.getElementById('retryStaleBtn').addEventListener('click', reloadStaleSources);
+}
+
+function markStale(source, savedAt) {
+    staleSources.set(source, savedAt);
+    updateStaleBanner();
+}
+
+function markFresh(source) {
+    staleSources.delete(source);
+    updateStaleBanner();
+}
+
+function reloadStaleSources() {
+    [...staleSources.keys()].forEach(source => DATA_LOADERS[source]());
+}
+
+// ===== Состояние загрузки =====
+
+// 'loading' | 'ready' | 'error'
+let articlesLoadState = 'loading';
+let proceduralLoadState = 'loading';
+
+function renderLoadState(container, state, errorText, onRetry) {
+    container.className = '';
+    if (state === 'loading') {
+        container.innerHTML = `<div class="loader">Синхронизация данных...</div>`;
+        return;
+    }
+    container.innerHTML = `
+        <div class="loader">
+            ${errorText}<br>
+            <button class="tab-btn retry-btn">Повторить попытку</button>
+        </div>
+    `;
+    container.querySelector('.retry-btn').addEventListener('click', onRetry);
+}
+
+function retryArticles() {
+    articlesLoadState = 'loading';
+    renderArticles();
+    loadData();
+}
+
+function retryProcedural() {
+    proceduralLoadState = 'loading';
+    renderArticles();
+    loadProceduralData();
 }
 
 // ===== Загрузка данных с Google Sheets =====
 
+const FETCH_TIMEOUT_MS = 8000;
+
 // Общий запрос+разбор gviz-ответа. Обработка ошибок — отдельно в каждом загрузчике.
 async function fetchGvizRows(url) {
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Сервер ответил с ошибкой: ${response.status}`);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) {
+            throw new Error(`Сервер ответил с ошибкой: ${response.status}`);
+        }
+        const text = await response.text();
+        const json = JSON.parse(text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1));
+        return json.table.rows;
+    } finally {
+        clearTimeout(timer);
     }
-    const text = await response.text();
-    const json = JSON.parse(text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1));
-    return json.table.rows;
 }
 
 // Приоритет f (форматированное) -> v (сырое) -> "" — порядок важен, не менять.
@@ -175,96 +243,170 @@ function normalizeFrequency(raw) {
     return raw.trim().toLowerCase() === 'частая' ? 'frequent' : 'rare';
 }
 
-async function loadData() {
-    const container = document.getElementById('articlesContainer');
-    try {
-        const rows = await fetchGvizRows(TIMEOUT_URL);
+// Звёзды в таблице можно писать цифрой от 1 до 5 — в памятке она показывается символами ★.
+function normalizeStars(raw) {
+    return raw.replace(/\b[1-5]\b/g, (digit) => '★'.repeat(Number(digit)));
+}
 
-        parsedDatabase = [];
-        rows.forEach((row) => {
-            if (!row.c) return;
-            const cells = row.c;
-            const getVal = (idx) => getCellVal(cells, idx);
+// ===== Проверка листа =====
+// При неверном имени листа Google молча отдаёт первый лист таблицы.
 
-            let rawCode = getVal(COL.CODE).toUpperCase();
-            if (rawCode === "КОДЕКС" || !CODE_MAP[rawCode]) return;
+const PK_KNOWN_TYPES = ['steps', 'list', 'text'];
 
-            parsedDatabase.push({
-                code: CODE_MAP[rawCode],
-                num: getVal(COL.NUM),
-                title: getVal(COL.TITLE) || (getVal(COL.DESC).split(/[.\n]/)[0].trim() + '.'),
-                desc: getVal(COL.DESC) || getVal(COL.TITLE),
-                stars: getVal(COL.STARS),
-                extraMeasure: getVal(COL.EXTRA_MEASURE),
-                fine: getVal(COL.FINE),
-                arrest: getVal(COL.ARREST),
-                felony: getVal(COL.FELONY),
-                type: getVal(COL.TYPE),   
-                tags: getVal(COL.TAGS),
-                frequency: normalizeFrequency(getVal(COL.FREQUENCY))
-            });
+function looksLikeArticlesSheet(rows) {
+    const filled = rows.filter(row => row.c && getCellVal(row.c, 0) !== '');
+    const withCode = filled.filter(row => CODE_MAP[getCellVal(row.c, COL.CODE).toUpperCase()]);
+    return withCode.length > 0 && withCode.length >= filled.length / 2;
+}
+
+function looksLikeProceduralSheet(rows) {
+    return rows.some(row => row.c && PK_KNOWN_TYPES.includes(getCellVal(row.c, 1).toLowerCase()));
+}
+
+function parseArticleRows(rows) {
+    const articles = [];
+    rows.forEach((row) => {
+        if (!row.c) return;
+        const cells = row.c;
+        const getVal = (idx) => getCellVal(cells, idx);
+
+        let rawCode = getVal(COL.CODE).toUpperCase();
+        if (rawCode === "КОДЕКС" || !CODE_MAP[rawCode]) return;
+
+        articles.push({
+            code: CODE_MAP[rawCode],
+            num: getVal(COL.NUM),
+            title: getVal(COL.TITLE) || (getVal(COL.DESC).split(/[.\n]/)[0].trim() + '.'),
+            desc: getVal(COL.DESC) || getVal(COL.TITLE),
+            stars: normalizeStars(getVal(COL.STARS)),
+            extraMeasure: getVal(COL.EXTRA_MEASURE),
+            fine: getVal(COL.FINE),
+            arrest: getVal(COL.ARREST),
+            felony: getVal(COL.FELONY),
+            type: getVal(COL.TYPE),
+            tags: getVal(COL.TAGS),
+            frequency: normalizeFrequency(getVal(COL.FREQUENCY))
         });
-        saveCache(parsedDatabase);
-        removeStaleBanner();
+    });
+    return articles;
+}
+
+// Сохранённая копия показывается сразу, свежие данные подменяют её после загрузки.
+async function loadData() {
+    const cached = loadCache(CACHE_KEY);
+    if (cached && articlesLoadState !== 'ready') {
+        parsedDatabase = cached.data;
+        articlesLoadState = 'ready';
         renderArticles();
+    }
+
+    try {
+        const fresh = parseArticleRows(await fetchGvizRows(DATA_URL));
+        if (fresh.length === 0) {
+            throw new Error('Таблица вернула пустой список статей');
+        }
+
+        saveCache(CACHE_KEY, fresh);
+        const changed = articlesLoadState !== 'ready' || JSON.stringify(fresh) !== JSON.stringify(parsedDatabase);
+        if (changed) {
+            parsedDatabase = fresh;
+            articlesLoadState = 'ready';
+            renderArticles();
+        }
+        markFresh('articles');
     } catch (e) {
         console.error(e);
-        const cached = loadCache();
-        if (cached) {
-            parsedDatabase = cached.data;
-            renderArticles();
-            showStaleBanner(cached.savedAt);
+        if (articlesLoadState === 'ready') {
+            markStale('articles', cached ? cached.savedAt : Date.now());
         } else {
-            container.innerHTML = `
-                <div class="loader">
-                    Не удалось загрузить базу данных. Проверьте интернет-соединение и попробуйте снова.<br>
-                    <button id="retryLoadBtn" class="tab-btn retry-btn">Повторить попытку</button>
-                </div>
-            `;
-            const retryBtn = document.getElementById('retryLoadBtn');
-            if (retryBtn) {
-                retryBtn.addEventListener('click', () => {
-                    container.innerHTML = `<div class="loader">Синхронизация данных...</div>`;
-                    loadData();
-                });
-            }
+            articlesLoadState = 'error';
+            renderArticles();
         }
     }
 }
 
 // ===== Общая информация: загрузка данных =====
 
+function parseProceduralRows(rows) {
+    const items = [];
+    rows.forEach((row) => {
+        if (!row.c) return;
+        const cells = row.c;
+        const getVal = (idx) => getCellVal(cells, idx);
+
+        const title = getVal(0);
+        if (!title || title === "Заголовок") return; // пропускаем пустые строки и строку-заголовок таблицы
+
+        items.push({
+            title: title,
+            type: getVal(1).toLowerCase(),
+            content: getVal(2)
+        });
+    });
+    return items;
+}
+
 // Отдельный лист, отдельная упрощённая структура полей — не смешивается с parsedDatabase.
 async function loadProceduralData() {
+    const cached = loadCache(PK_CACHE_KEY);
+    if (cached && proceduralLoadState !== 'ready') {
+        proceduralData = cached.data;
+        proceduralLoadState = 'ready';
+        if (currentCode === 'pk') renderArticles();
+    }
+
     try {
         const rows = await fetchGvizRows(PK_URL);
+        if (looksLikeArticlesSheet(rows)) {
+            throw new Error('Вместо листа "Общая информация" таблица вернула лист статей');
+        }
+        const fresh = parseProceduralRows(rows);
+        if (fresh.length > 0 && fresh.every(item => item.content === '')) {
+            throw new Error('Вместо листа "Общая информация" таблица вернула другой лист');
+        }
 
-        proceduralData = [];
-        rows.forEach((row) => {
-            if (!row.c) return;
-            const cells = row.c;
-            const getVal = (idx) => getCellVal(cells, idx);
-
-            const title = getVal(0);
-            if (!title || title === "Заголовок") return; // пропускаем пустые строки и строку-заголовок таблицы
-
-            proceduralData.push({
-                title: title,
-                type: getVal(1).toLowerCase(),
-                content: getVal(2)
-            });
-        });
+        saveCache(PK_CACHE_KEY, fresh);
+        const changed = proceduralLoadState !== 'ready' || JSON.stringify(fresh) !== JSON.stringify(proceduralData);
+        if (changed) {
+            proceduralData = fresh;
+            proceduralLoadState = 'ready';
+            if (currentCode === 'pk') renderArticles();
+        }
+        markFresh('procedural');
     } catch (e) {
-        console.error('Не удалось загрузить данные Процессуального кодекса:', e);
+        console.error('Не удалось загрузить данные раздела "Общая информация":', e);
+        if (proceduralLoadState === 'ready') {
+            markStale('procedural', cached ? cached.savedAt : Date.now());
+        } else {
+            proceduralLoadState = 'error';
+            if (currentCode === 'pk') renderArticles();
+        }
     }
 }
 
+const DATA_LOADERS = {
+    articles: loadData,
+    procedural: loadProceduralData
+};
+
 // ===== Дата последней редакции: загрузка и уведомление =====
+
+function showDbDate(dbDate) {
+    document.querySelectorAll('.footer-meta-date').forEach(el => {
+        el.textContent = `Последняя редакция: ${dbDate}`;
+    });
+}
 
 // Лист "Последняя редакция": A1 — заголовок, A2 — дата (вписывается вручную).
 async function loadMetaData() {
+    const seenDate = localStorage.getItem(DB_DATE_SEEN_KEY);
+    if (seenDate) showDbDate(seenDate);
+
     try {
         const rows = await fetchGvizRows(META_URL);
+        if (looksLikeArticlesSheet(rows) || looksLikeProceduralSheet(rows)) {
+            throw new Error('Вместо листа "Последняя редакция" таблица вернула другой лист');
+        }
         for (const row of rows) {
             if (!row.c) continue;
             const value = getCellVal(row.c, 0);
@@ -277,49 +419,304 @@ async function loadMetaData() {
     }
 }
 
-// Тост сразу, если дата отличается от увиденной раньше; иначе не чаще раза в день.
+// Тост при первом заходе на сайт и при смене даты.
 function notifyDbDate(dbDate) {
-    document.querySelectorAll('.settings-meta-date').forEach(el => {
-        el.textContent = `Последняя редакция: ${dbDate}`;
-    });
+    showDbDate(dbDate);
 
-    const today = new Date().toDateString();
-    const seenDate = localStorage.getItem(DB_DATE_SEEN_KEY);
-
-    if (seenDate !== dbDate) {
-        localStorage.setItem(DB_DATE_SEEN_KEY, dbDate);
-        localStorage.setItem(DB_DATE_TOAST_DAY_KEY, today);
-        showToast(`Последняя редакция: ${dbDate}`);
-        return;
-    }
-
-    if (localStorage.getItem(DB_DATE_TOAST_DAY_KEY) !== today) {
-        localStorage.setItem(DB_DATE_TOAST_DAY_KEY, today);
-        showToast(`Последняя редакция: ${dbDate}`);
-    }
+    if (localStorage.getItem(DB_DATE_SEEN_KEY) === dbDate) return;
+    localStorage.setItem(DB_DATE_SEEN_KEY, dbDate);
+    showToast(`Последняя редакция: ${dbDate}`);
 }
 
-function escapeRegex(str) {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
 function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+    return String(str).replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
+}
+
+// ===== Поиск: разбор запроса =====
+
+const SEARCH_WORD_RE = /[a-zа-я0-9]+/g;
+
+const SEARCH_STOP_WORDS = new Set([
+    'в', 'во', 'на', 'по', 'не', 'ни', 'с', 'со', 'к', 'ко', 'у', 'о', 'об', 'от', 'до', 'за', 'из',
+    'и', 'а', 'но', 'или', 'ли', 'же', 'бы', 'то', 'что', 'как', 'это', 'при', 'для', 'без', 'под',
+    'над', 'про', 'он', 'она', 'они', 'его', 'ее', 'их', 'был', 'была', 'было', 'были', 'нет', 'да',
+    'мы', 'ты', 'вы', 'меня', 'мне', 'ст', 'статья', 'статьи', 'статью', 'статье'
+]);
+
+const SEARCH_CODE_ALIASES = { 'ук': 'uk', 'ак': 'ak', 'дк': 'dk', 'uk': 'uk', 'ak': 'ak', 'dk': 'dk' };
+
+const SEARCH_ENDINGS = [
+    'иваться', 'ываться', 'ениями', 'аниями', 'остью', 'анием', 'ением',
+    'ться', 'ется', 'ится', 'ются', 'ятся', 'ался', 'ился', 'ение', 'ения', 'ению', 'ание', 'ания',
+    'анию', 'ании', 'ении', 'ости', 'ость', 'ного', 'ному', 'ными', 'ской', 'ских', 'ским', 'ского',
+    'алась', 'ались', 'илась', 'ились',
+    'ами', 'ями', 'ыми', 'ими', 'ого', 'его', 'ому', 'ему', 'ать', 'ять', 'ить', 'еть', 'уть',
+    'ала', 'али', 'ало', 'ила', 'или', 'ило', 'ела', 'ели', 'ешь',
+    'ах', 'ях', 'ов', 'ев', 'ей', 'ой', 'ий', 'ый', 'ая', 'яя', 'ое', 'ее', 'ые', 'ие', 'ую', 'юю',
+    'ом', 'ем', 'ам', 'ям', 'ым', 'им', 'ых', 'их', 'ал', 'ил', 'ел', 'ет', 'ут', 'ют', 'ит', 'ат', 'ят',
+    'ла', 'ли', 'ло',
+    'а', 'я', 'о', 'е', 'ы', 'и', 'у', 'ю', 'ь', 'й', 'л'
+].sort((a, b) => b.length - a.length);
+
+const SEARCH_MIN_STEM = 3;
+
+function normalizeSearchText(str) {
+    return String(str).toLowerCase().replace(/ё/g, 'е');
+}
+
+function splitSearchWords(str) {
+    return normalizeSearchText(str).match(SEARCH_WORD_RE) || [];
+}
+
+function stemSearchWord(word) {
+    if (word.length <= SEARCH_MIN_STEM || /\d/.test(word)) return word;
+    for (const ending of SEARCH_ENDINGS) {
+        if (word.endsWith(ending) && word.length - ending.length >= SEARCH_MIN_STEM) {
+            return word.slice(0, -ending.length);
+        }
+    }
+    return word;
+}
+
+// words — слова, numbers — номера статей, parts — "ч.N", codes — фильтр по кодексу.
+function parseSearchQuery(raw, { allowCodes = true } = {}) {
+    const query = { words: [], numbers: [], parts: [], codes: [], total: 0, active: false };
+
+    const text = normalizeSearchText(raw)
+        .replace(/част[ьи]\s*(\d+)/g, 'ч.$1')
+        .replace(/(\d)(ч\.)/g, '$1 $2')
+        .replace(/(^|[^a-zа-я0-9])ч\.?\s*(\d+)/g, '$1ч.$2');
+
+    text.split(/[\s,;]+/).forEach(chunk => {
+        const token = chunk.replace(/^[^a-zа-я0-9]+|[^a-zа-я0-9]+$/g, '');
+        if (!token) return;
+
+        if (/^\d+(\.\d+)*$/.test(token)) {
+            if (!query.numbers.includes(token)) query.numbers.push(token);
+            return;
+        }
+        if (/^ч\.\d+$/.test(token)) {
+            if (!query.parts.includes(token)) query.parts.push(token);
+            return;
+        }
+
+        (token.match(SEARCH_WORD_RE) || []).forEach(piece => {
+            if (allowCodes && SEARCH_CODE_ALIASES[piece]) {
+                const code = SEARCH_CODE_ALIASES[piece];
+                if (!query.codes.includes(code)) query.codes.push(code);
+                return;
+            }
+            if (SEARCH_STOP_WORDS.has(piece)) return;
+            if (/^\d+$/.test(piece)) {
+                if (!query.numbers.includes(piece)) query.numbers.push(piece);
+                return;
+            }
+            if (piece.length < 2) return;
+            if (query.words.some(w => w.full === piece)) return;
+            query.words.push({ full: piece, stem: stemSearchWord(piece), minLevel: 1 });
+        });
+    });
+
+    query.total = query.words.length + query.numbers.length + query.parts.length;
+    query.active = query.total > 0 || query.codes.length > 0;
+    return query;
+}
+
+// ===== Поиск: сопоставление и сортировка =====
+
+// 0 — нет совпадения, 1 — родственное слово, 2 — то же слово в другой форме.
+function searchWordLevel(word, token) {
+    const stem = token.stem;
+    if (stem.length < SEARCH_MIN_STEM) return word === token.full ? 2 : 0;
+    const at = word.indexOf(stem);
+    if (at === -1) return 0;
+    const shortTail = word.length - at - stem.length <= Math.max(5, stem.length);
+    if (at === 0) return shortTail ? 2 : 1;
+    return (stem.length >= 4 && at <= 3 && shortTail) ? 1 : 0;
+}
+
+function bestWordLevel(words, token) {
+    let best = 0;
+    for (const word of words) {
+        const level = searchWordLevel(word, token);
+        if (level > best) best = level;
+        if (best === 2) break;
+    }
+    return best;
+}
+
+// Вес совпадения по уровням [0, 1, 2] для каждого поля.
+const SEARCH_WEIGHTS = {
+    title: [0, 6, 10],
+    tags: [0, 4, 7],
+    desc: [0, 2, 5]
+};
+const SEARCH_NUM_EXACT = 100;
+const SEARCH_NUM_CHILD = 60;
+const SEARCH_NUM_PART = 50;
+const SEARCH_NUM_IN_TEXT = 2;
+
+// Родственные слова учитываются, только если само слово встречается реже этого числа записей.
+const SEARCH_RELATED_LIMIT = 3;
+
+const NUM_BASE_RE = /^\d+(\.\d+)*/;
+
+const searchIndexCache = new WeakMap();
+
+function getArticleSearchIndex(article) {
+    let index = searchIndexCache.get(article);
+    if (!index) {
+        const num = normalizeSearchText(article.num).replace(/ч\.\s+/g, 'ч.');
+        index = {
+            num,
+            numBase: (num.match(NUM_BASE_RE) || [''])[0],
+            title: splitSearchWords(article.title),
+            tags: splitSearchWords(article.tags),
+            desc: splitSearchWords(article.desc)
+        };
+        searchIndexCache.set(article, index);
+    }
+    return index;
+}
+
+function getProceduralSearchIndex(item) {
+    let index = searchIndexCache.get(item);
+    if (!index) {
+        index = {
+            num: '',
+            numBase: '',
+            title: splitSearchWords(item.title),
+            tags: [],
+            desc: splitSearchWords(item.content)
+        };
+        searchIndexCache.set(item, index);
+    }
+    return index;
+}
+
+function numberScore(index, number, allowInText) {
+    if (index.numBase === number) return SEARCH_NUM_EXACT;
+    if (index.numBase.startsWith(number + '.')) return SEARCH_NUM_CHILD;
+    if (allowInText && !number.includes('.') &&
+        (index.title.includes(number) || index.desc.includes(number) || index.tags.includes(number))) {
+        return SEARCH_NUM_IN_TEXT;
+    }
+    return 0;
+}
+
+// entries: [{ item, index, tie }]. Сначала записи, где нашлись все слова запроса;
+// если таких нет — где нашлась хотя бы часть.
+function rankBySearch(entries, query) {
+    const levels = entries.map(entry => query.words.map(token => [
+        bestWordLevel(entry.index.title, token),
+        bestWordLevel(entry.index.tags, token),
+        bestWordLevel(entry.index.desc, token)
+    ]));
+
+    query.words.forEach((token, i) => {
+        const exactCount = levels.filter(entryLevels => Math.max(...entryLevels[i]) === 2).length;
+        token.minLevel = exactCount < SEARCH_RELATED_LIMIT ? 1 : 2;
+    });
+
+    const numberInText = query.numbers.map(number =>
+        query.words.length > 0 || !entries.some(entry => numberScore(entry.index, number, false) > 0));
+
+    const results = [];
+    entries.forEach((entry, order) => {
+        let matched = 0;
+        let score = 0;
+
+        query.numbers.forEach((number, i) => {
+            const value = numberScore(entry.index, number, numberInText[i]);
+            if (value) { matched += 1; score += value; }
+        });
+
+        query.parts.forEach(part => {
+            if (` ${entry.index.num} `.includes(` ${part} `)) { matched += 1; score += SEARCH_NUM_PART; }
+        });
+
+        query.words.forEach((token, i) => {
+            const [title, tags, desc] = levels[order][i].map(level => (level < token.minLevel ? 0 : level));
+            const value = Math.max(SEARCH_WEIGHTS.title[title], SEARCH_WEIGHTS.tags[tags], SEARCH_WEIGHTS.desc[desc]);
+            if (value) { matched += 1; score += value; }
+        });
+
+        if (query.total > 0 && matched === 0) return;
+        results.push({ item: entry.item, matched, score, order, tie: entry.tie });
+    });
+
+    const complete = results.filter(r => r.matched === query.total);
+    return (complete.length ? complete : results)
+        .sort((a, b) => (b.matched - a.matched) || (b.score - a.score) || (a.tie - b.tie) || (a.order - b.order))
+        .map(r => r.item);
+}
+
+function searchArticles(query) {
+    const entries = parsedDatabase
+        .filter(article => !query.codes.length || query.codes.includes(article.code))
+        .map(article => ({
+            item: article,
+            index: getArticleSearchIndex(article),
+            tie: article.code === currentCode ? 0 : 1
+        }));
+    return rankBySearch(entries, query).map(article => ({ article }));
+}
+
+function searchProceduralCards(query) {
+    const entries = proceduralData.map(item => ({ item, index: getProceduralSearchIndex(item), tie: 0 }));
+    return rankBySearch(entries, query);
+}
+
+// ===== Поиск: подсветка =====
+
+function wrapHighlightRanges(text, ranges) {
+    let html = '';
+    let last = 0;
+    ranges.sort((a, b) => a[0] - b[0]).forEach(([start, end]) => {
+        if (end <= last) return;
+        const from = Math.max(start, last);
+        html += escapeHtml(text.slice(last, from));
+        html += `<span class="highlight">${escapeHtml(text.slice(from, end))}</span>`;
+        last = end;
+    });
+    return html + escapeHtml(text.slice(last));
+}
+
+function highlightText(text, query) {
+    if (!query) return escapeHtml(text);
+    const normalized = normalizeSearchText(text);
+    if (normalized.length !== text.length) return escapeHtml(text);
+
+    const ranges = [];
+    for (const match of normalized.matchAll(SEARCH_WORD_RE)) {
+        const word = match[0];
+        const isHit = query.numbers.includes(word) ||
+            query.words.some(token => searchWordLevel(word, token) >= token.minLevel);
+        if (isHit) ranges.push([match.index, match.index + word.length]);
+    }
+    return wrapHighlightRanges(text, ranges);
+}
+
+function highlightArticleNum(num, query) {
+    if (!query) return escapeHtml(num);
+    const normalized = normalizeSearchText(num);
+    if (normalized.length !== num.length) return escapeHtml(num);
+
+    const ranges = [];
+    const base = (normalized.match(NUM_BASE_RE) || [''])[0];
+    query.numbers.forEach(number => {
+        if (base === number || base.startsWith(number + '.')) ranges.push([0, number.length]);
+    });
+    query.parts.forEach(part => {
+        const match = normalized.match(new RegExp(`ч\\.\\s*${part.slice(2)}(?!\\d)`));
+        if (match) ranges.push([match.index, match.index + match[0].length]);
+    });
+    return wrapHighlightRanges(num, ranges);
 }
 
 // ===== Хелперы рендера статей (общие для карточек и списка) =====
-
-function highlightMatches(text, isSearching, searchWords) {
-    if (!isSearching) return text;
-    let result = text;
-    searchWords.forEach(word => {
-        const regex = new RegExp(`(${escapeRegex(word)})`, 'gi');
-        result = result.replace(regex, '<span class="highlight">$1</span>');
-    });
-    return result;
-}
 
 // Бейдж типа статьи (Ф/Р и т.п.) с расшифровкой в title. Только для УК.
 function buildTypeBadge(article, extraClass = '') {
@@ -328,6 +725,13 @@ function buildTypeBadge(article, extraClass = '') {
     if (!safeType || safeType === '-') return '';
     const typeLabel = TYPE_LABELS[article.type] || '';
     return `<div class="article-type ${extraClass}" title="${escapeHtml(typeLabel)}">${safeType}</div>`;
+}
+
+// Плашка кодекса (УК/АК/ДК) в цвет кодекса — только в результатах поиска.
+function buildCodeBadge(article, query, extraClass = '') {
+    const label = CODE_LABELS[article.code];
+    if (!query || !label) return '';
+    return `<div class="article-type article-code ${article.code} ${extraClass}" title="${CODE_NAMES[article.code] || ''}">${label}</div>`;
 }
 
 // Кнопка закрепления (иконка-булавка). size=15 в карточках, size=14 в списке.
@@ -382,61 +786,68 @@ function copyArticleNumber(article) {
     const codeLabel = CODE_LABELS[article.code] || '';
     const text = `ст. ${article.num} ${codeLabel}`.trim();
 
+    const onFail = () => {
+        console.warn('Не удалось скопировать номер статьи в буфер обмена');
+        showToast('Не удалось скопировать');
+    };
+
+    if (!navigator.clipboard) {
+        onFail();
+        return;
+    }
+
     navigator.clipboard.writeText(text)
         .then(() => showToast('Скопировано'))
-        .catch(() => console.warn('Не удалось скопировать номер статьи в буфер обмена'));
+        .catch(onFail);
 }
 
 // ===== Основной рендер =====
 
-function renderArticles() {
+function renderArticles({ keepExpanded = false } = {}) {
     const container = document.getElementById('articlesContainer');
 
-    const filterText = document.getElementById('searchInput').value.toLowerCase().trim();
-    const isSearching = filterText.length > 0;
+    const rawQuery = document.getElementById('searchInput').value;
 
-    // При активном поиске ПК не рендерится отдельно — показываются обычные
-    // результаты по УК/АК/ДК, как с любой другой вкладки.
-    if (currentCode === 'pk' && !isSearching) {
+    const tabs = document.querySelector('.tabs');
+    tabs.classList.remove('searching');
+
+    // На вкладке "Общая информация" поиск идёт только по её карточкам.
+    if (currentCode === 'pk') {
+        const pkQuery = parseSearchQuery(rawQuery, { allowCodes: false });
         container.className = '';
-        renderProceduralCards(container);
+        renderProceduralCards(container, pkQuery.active ? pkQuery : null);
         return;
     }
 
-    let searchWords = [];
-    if (isSearching) {
-        searchWords = filterText.split(/\s+/).filter(w => w.length > 1 || /^\d+$/.test(w));
+    if (articlesLoadState !== 'ready') {
+        renderLoadState(container, articlesLoadState,
+            'Не удалось загрузить базу данных. Проверьте интернет-соединение и попробуйте снова.', retryArticles);
+        return;
     }
+
+    const parsedQuery = parseSearchQuery(rawQuery);
+    const query = parsedQuery.active ? parsedQuery : null;
+    tabs.classList.toggle('searching', Boolean(query));
 
     let matchedArticles = [];
 
-    parsedDatabase.forEach(article => {
-        if (!isSearching && article.code !== currentCode) return;
-        if (!isSearching && currentDisplayMode === 'compact' && article.frequency === 'rare') return;
+    if (query) {
+        matchedArticles = searchArticles(query);
+    } else {
+        parsedDatabase.forEach(article => {
+            if (article.code !== currentCode) return;
+            if (currentDisplayMode === 'compact' && article.frequency === 'rare' && !isPinned(article)) return;
+            matchedArticles.push({ article });
+        });
 
-        let matchScore = 0;
+        // Вне поиска — закреплённые статьи первыми (сортировка стабильна).
+        matchedArticles.sort((a, b) => (isPinned(b.article) ? 1 : 0) - (isPinned(a.article) ? 1 : 0));
+    }
 
-        if (isSearching) {
-            const searchableText = `${article.num} ${article.title} ${article.desc} ${article.tags}`.toLowerCase();
-            
-            searchWords.forEach(word => {
-                if (searchableText.includes(word)) {
-                    matchScore += 1;
-                }
-            });
-
-            if (matchScore === 0) return;
-        }
-
-        matchedArticles.push({ article, matchScore });
-    });
-
-    // Вне поиска — закреплённые статьи первыми (сортировка стабильна).
-    // При поиске пины игнорируются, работает только релевантность.
-    matchedArticles.sort((a, b) => {
-        if (isSearching) return b.matchScore - a.matchScore;
-        return (isPinned(b.article) ? 1 : 0) - (isPinned(a.article) ? 1 : 0);
-    });
+    const expandedIds = new Set();
+    if (keepExpanded) {
+        container.querySelectorAll('.row.expanded').forEach(row => expandedIds.add(row.dataset.articleId));
+    }
 
     container.innerHTML = "";
     container.className = currentView === 'list' ? 'list-view' : '';
@@ -447,9 +858,9 @@ function renderArticles() {
     }
 
     if (currentView === 'list') {
-        renderAsList(container, matchedArticles, isSearching, searchWords);
+        renderAsList(container, matchedArticles, query, expandedIds);
     } else {
-        renderAsCards(container, matchedArticles, isSearching, searchWords);
+        renderAsCards(container, matchedArticles, query);
     }
 }
 
@@ -467,23 +878,37 @@ function pluralizeStars(count) {
 }
 
 function starsTitle(article) {
-    const count = article.stars.length;
-    if (!count) return 'Розыск';
+    const runs = article.stars.match(/★+/g);
+    if (!runs) return 'Розыск';
+    const count = runs[runs.length - 1].length;
+    if (runs.length > 1) return `от ${runs[0].length} до ${count} звёзд`;
     return `${count} ${pluralizeStars(count)}`;
 }
 
-function buildHighlightedFields(article, isSearching, searchWords) {
+// В списке диапазон звёзд показывается коротко: «★★–★★★».
+function starsShort(stars) {
+    const runs = stars.match(/★+/g);
+    return runs && runs.length > 1 ? `${runs[0]}–${runs[runs.length - 1]}` : stars;
+}
+
+function buildStarsTag(article) {
+    const short = starsShort(article.stars);
+    const rangeClass = short !== article.stars ? 'row-stars-range' : '';
+    return `<div class="row-tag row-slot-stars ${rangeClass}" title="${starsTitle(article)}">${escapeHtml(short) || '—'}</div>`;
+}
+
+function buildHighlightedFields(article, query) {
     return {
-        title: highlightMatches(escapeHtml(article.title), isSearching, searchWords),
-        num: highlightMatches(escapeHtml(article.num), isSearching, searchWords),
-        desc: highlightMatches(escapeHtml(article.desc), isSearching, searchWords).replace(/\n/g, '<br>'),
+        title: highlightText(article.title, query),
+        num: highlightArticleNum(article.num, query),
+        desc: highlightText(article.desc, query).replace(/\n/g, '<br>'),
     };
 }
 
 // ===== Отрисовка: карточки =====
 
 // Фильтрация/поиск/сортировка уже выполнены в renderArticles() — здесь только разметка.
-function renderAsCards(container, matchedArticles, isSearching, searchWords) {
+function renderAsCards(container, matchedArticles, query) {
     matchedArticles.forEach(item => {
         const article = item.article;
 
@@ -491,7 +916,7 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
         card.className = `card ${article.code} ${isPinned(article) ? 'pinned' : ''}`;
 
         const { title: highlightedTitle, num: highlightedNum, desc: highlightedDesc } =
-            buildHighlightedFields(article, isSearching, searchWords);
+            buildHighlightedFields(article, query);
 
         const typeHtml = buildTypeBadge(article);
 
@@ -507,7 +932,7 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
                     ${buildPinButton(article, 15)}
                     <div class="title" title="${escapeHtml(article.title)}">${highlightedTitle}</div>
                 </div>
-                <div class="card-header-right">${typeHtml}<div class="badge-num">ст. ${highlightedNum}</div></div>
+                <div class="card-header-right">${buildCodeBadge(article, query)}${typeHtml}<div class="badge-num">ст. ${highlightedNum}</div></div>
             </div>
             <div class="info-table">
                 <div class="info-row"><div class="info-label">Штраф</div><div class="info-val">${safeFine || '—'}</div></div>
@@ -529,29 +954,32 @@ function renderAsCards(container, matchedArticles, isSearching, searchWords) {
 
 // Фильтрация/поиск/сортировка уже выполнены в renderArticles(). Строка кликабельна —
 // раскрывает/скрывает полное описание.
-function renderAsList(container, matchedArticles, isSearching, searchWords) {
+function renderAsList(container, matchedArticles, query, expandedIds) {
     matchedArticles.forEach(item => {
         const article = item.article;
 
         const row = document.createElement('div');
-        row.className = `row ${article.code} ${isPinned(article) ? 'pinned' : ''}`;
+        const isExpanded = expandedIds.has(articleId(article));
+        row.className = `row ${article.code} ${isPinned(article) ? 'pinned' : ''} ${isExpanded ? 'expanded' : ''}`;
+        row.dataset.articleId = articleId(article);
 
         const { title: highlightedTitle, num: highlightedNum, desc: highlightedDesc } =
-            buildHighlightedFields(article, isSearching, searchWords);
+            buildHighlightedFields(article, query);
 
         const typeHtml = buildTypeBadge(article, 'row-slot-type');
 
         // row-slot-* — фиксированная ширина, заголовок начинается в одной позиции.
         const leftHtml = `
+            ${buildCodeBadge(article, query, 'row-slot-code')}
             ${typeHtml}
             <div class="badge-num row-num row-slot-num">ст. ${highlightedNum}</div>
             <div class="row-title" title="${escapeHtml(article.title)}">${buildPinButton(article, 14)}${highlightedTitle}</div>
         `;
 
-        // УК — звёзды/штраф/арест; АК и ДК — доп. мера/штраф. row-slot-* держат ширину.
+        // УК — штраф/звёзды/арест; АК и ДК — доп. мера/штраф, звёзды и арест — только если заполнены.
+        // row-slot-* держат ширину.
         let rightHtml = '';
         if (article.code === 'uk') {
-            const safeStars = escapeHtml(article.stars);
             const safeFine = escapeHtml(article.fine);
             const safeArrest = escapeHtml(article.arrest);
             const hasFelony = hasFelonyRecord(article);
@@ -561,22 +989,32 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
 
             rightHtml = `
                 <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="${safeFine ? `Штраф: ${safeFine}` : 'Штраф'}">${safeFine || '—'}</div>
-                <div class="row-tag row-slot-stars" title="${starsTitle(article)}">${safeStars || '—'}</div>
+                ${buildStarsTag(article)}
                 <div class="row-tag row-slot-arrest ${hasFelony ? 'row-danger' : ''}" title="${arrestTitle}">${safeArrest || '—'}</div>
             `;
         } else {
             const safeExtraMeasure = escapeHtml(article.extraMeasure);
             const safeFine = escapeHtml(article.fine);
             const hasExtraMeasure = Boolean(article.extraMeasure);
+            let extraHtml = `<div class="row-tag row-slot-extra ${hasExtraMeasure ? '' : 'row-hidden'}" title="${hasExtraMeasure ? safeExtraMeasure : ''}">${safeExtraMeasure}</div>`;
+            // Звёзды и арест у статьи АК или ДК: плашки встают на место пустой доп. меры, вплотную к штрафу.
+            const safeArrest = escapeHtml(article.arrest);
+            const penaltyHtml = (article.stars ? buildStarsTag(article) : '')
+                + (safeArrest ? `<div class="row-tag row-slot-arrest" title="Арест: ${safeArrest}">${safeArrest}</div>` : '');
+            if (penaltyHtml) {
+                extraHtml = hasExtraMeasure
+                    ? penaltyHtml + extraHtml
+                    : `<div class="row-slot-holder">${penaltyHtml}</div>`;
+            }
 
             rightHtml = `
-                <div class="row-tag row-slot-extra ${hasExtraMeasure ? '' : 'row-hidden'}" title="${hasExtraMeasure ? safeExtraMeasure : ''}">${safeExtraMeasure}</div>
+                ${extraHtml}
                 <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="${safeFine ? `Штраф: ${safeFine}` : 'Штраф'}">${safeFine || '—'}</div>
             `;
         }
 
         row.innerHTML = `
-            <div class="row-header" role="button" tabindex="0" aria-expanded="false">
+            <div class="row-header" role="button" tabindex="0" aria-expanded="${isExpanded}">
                 <div class="row-left">${leftHtml}</div>
                 <div class="row-right">${rightHtml}</div>
                 <svg class="row-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -612,36 +1050,42 @@ function renderAsList(container, matchedArticles, isSearching, searchWords) {
 }
 
 // ===== Общая информация: диспетчер шаблонов =====
-// "text" и "table" пока не реализованы — добавим по необходимости.
 const PK_TEMPLATES = {
     steps: renderPkSteps,
     list: renderPkList,
 };
 
-function renderPkSteps(content) {
-    const steps = content.split('\n').map(s => s.trim()).filter(Boolean);
-    const items = steps.map(step => `<li>${escapeHtml(step)}</li>`).join('');
-    return `<ol class="pk-steps">${items}</ol>`;
+function buildPkItems(content, query) {
+    return content.split('\n').map(s => s.trim()).filter(Boolean)
+        .map(line => `<li>${highlightText(line, query)}</li>`).join('');
+}
+
+function renderPkSteps(content, query) {
+    return `<ol class="pk-steps">${buildPkItems(content, query)}</ol>`;
 }
 
 // Маркированный список — порядок пунктов не важен (в отличие от "steps")
-function renderPkList(content) {
-    const points = content.split('\n').map(s => s.trim()).filter(Boolean);
-    const items = points.map(point => `<li>${escapeHtml(point)}</li>`).join('');
-    return `<ul class="pk-list">${items}</ul>`;
+function renderPkList(content, query) {
+    return `<ul class="pk-list">${buildPkItems(content, query)}</ul>`;
 }
 
 // Safe-fallback для "text" и неизвестных значений — карточка не теряется молча.
-function renderPkFallback(content) {
-    return `<p>${escapeHtml(content).replace(/\n/g, '<br>')}</p>`;
+function renderPkFallback(content, query) {
+    return `<p>${highlightText(content, query).replace(/\n/g, '<br>')}</p>`;
 }
 
-function renderProceduralCardBody(item) {
+function renderProceduralCardBody(item, query) {
     const renderer = PK_TEMPLATES[item.type];
-    return renderer ? renderer(item.content) : renderPkFallback(item.content);
+    return renderer ? renderer(item.content, query) : renderPkFallback(item.content, query);
 }
 
-function renderProceduralCards(container) {
+function renderProceduralCards(container, query = null) {
+    if (proceduralLoadState !== 'ready') {
+        renderLoadState(container, proceduralLoadState,
+            'Не удалось загрузить раздел. Проверьте интернет-соединение и попробуйте снова.', retryProcedural);
+        return;
+    }
+
     container.innerHTML = '';
 
     if (proceduralData.length === 0) {
@@ -649,41 +1093,58 @@ function renderProceduralCards(container) {
         return;
     }
 
-    proceduralData.forEach(item => {
+    const items = query ? searchProceduralCards(query) : proceduralData;
+
+    if (items.length === 0) {
+        container.innerHTML = `<div class="loader">По запросу ничего не найдено. Попробуйте описать иначе.</div>`;
+        return;
+    }
+
+    items.forEach(item => {
         const card = document.createElement('div');
         card.className = 'card pk';
 
         card.innerHTML = `
             <div class="card-header">
-                <div class="title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
+                <div class="title" title="${escapeHtml(item.title)}">${highlightText(item.title, query)}</div>
             </div>
-            <div class="pk-body">${renderProceduralCardBody(item)}</div>
+            <div class="pk-body">${renderProceduralCardBody(item, query)}</div>
         `;
         container.appendChild(card);
     });
 }
 
+const SEARCH_PLACEHOLDER_DEFAULT = document.getElementById('searchInput').placeholder;
+const SEARCH_PLACEHOLDER_PK = 'Поиск по общей информации...';
+
 document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', (e) => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    e.target.classList.add('active');
-    currentCode = e.target.getAttribute('data-code');
+    e.currentTarget.classList.add('active');
+    currentCode = e.currentTarget.getAttribute('data-code');
     
     clearTimeout(searchDebounceTimer);
     const searchInput = document.getElementById('searchInput');
     if (searchInput.value !== "") {
         searchInput.value = "";
     }
+    syncSearchClearBtn();
+    searchInput.placeholder = currentCode === 'pk' ? SEARCH_PLACEHOLDER_PK : SEARCH_PLACEHOLDER_DEFAULT;
     renderArticles();
+    scrollToListTop();
 }));
 
 // ===== Переключатели: режим отображения и вид =====
 
-function syncModeToggleUI() {
-    document.querySelectorAll('.mode-btn').forEach(btn => {
-        const isActive = btn.getAttribute('data-mode') === currentDisplayMode;
+function syncToggleUI(selector, attribute, value) {
+    document.querySelectorAll(selector).forEach(btn => {
+        const isActive = btn.getAttribute(attribute) === value;
         btn.classList.toggle('active', isActive);
         btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
     });
+}
+
+function syncModeToggleUI() {
+    syncToggleUI('.mode-btn', 'data-mode', currentDisplayMode);
 }
 
 const DISPLAY_MODE_TOAST = {
@@ -698,17 +1159,13 @@ document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('clic
     localStorage.setItem(DISPLAY_MODE_KEY, currentDisplayMode);
     syncModeToggleUI();
     renderArticles();
-    if (toggleNotificationsEnabled) showToast(DISPLAY_MODE_TOAST[currentDisplayMode]);
+    showToast(DISPLAY_MODE_TOAST[currentDisplayMode]);
 }));
 
 syncModeToggleUI();
 
 function syncViewToggleUI() {
-    document.querySelectorAll('.view-btn').forEach(btn => {
-        const isActive = btn.getAttribute('data-view') === currentView;
-        btn.classList.toggle('active', isActive);
-        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-    });
+    syncToggleUI('.view-btn', 'data-view', currentView);
 }
 
 const VIEW_TOAST = {
@@ -723,7 +1180,7 @@ document.querySelectorAll('.view-btn').forEach(btn => btn.addEventListener('clic
     localStorage.setItem(VIEW_KEY, currentView);
     syncViewToggleUI();
     renderArticles();
-    if (toggleNotificationsEnabled) showToast(VIEW_TOAST[currentView]);
+    showToast(VIEW_TOAST[currentView]);
 }));
 
 syncViewToggleUI();
@@ -787,21 +1244,16 @@ settingsPanel.addEventListener('click', (e) => {
     e.stopPropagation();
 });
 
-// ===== Настройка "Уведомления тумблеров" =====
-const notificationsToggle = document.getElementById('notificationsToggle');
-notificationsToggle.checked = toggleNotificationsEnabled;
-notificationsToggle.addEventListener('change', () => {
-    toggleNotificationsEnabled = notificationsToggle.checked;
-    localStorage.setItem(NOTIFICATIONS_KEY, String(toggleNotificationsEnabled));
-});
-
 document.addEventListener('click', () => {
     closeSettingsPanel();
 });
 
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
+    if (e.key !== 'Escape') return;
+    if (settingsPanel.classList.contains('open')) {
         closeSettingsPanel();
+    } else if (searchField.value !== '') {
+        clearSearch();
     }
 });
 
@@ -822,16 +1274,45 @@ window.addEventListener('scroll', () => {
     }
 });
 
-scrollTopBtn.addEventListener('click', () => {
+function scrollToListTop() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-});
+}
+
+scrollTopBtn.addEventListener('click', scrollToListTop);
 
 updateScrollTopVisibility();
 
-document.getElementById('searchInput').addEventListener('input', () => {
+// ===== Поле поиска: очистка =====
+const searchField = document.getElementById('searchInput');
+const searchClearBtn = document.getElementById('searchClearBtn');
+
+function syncSearchClearBtn() {
+    if (!searchClearBtn) return;
+    searchClearBtn.classList.toggle('visible', searchField.value !== '');
+}
+
+function clearSearch() {
     clearTimeout(searchDebounceTimer);
-    searchDebounceTimer = setTimeout(renderArticles, 150);
+    searchField.value = '';
+    syncSearchClearBtn();
+    renderArticles();
+    scrollToListTop();
+    searchField.focus();
+}
+
+searchField.addEventListener('input', () => {
+    syncSearchClearBtn();
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+        renderArticles();
+        scrollToListTop();
+    }, 150);
 });
+
+if (searchClearBtn) searchClearBtn.addEventListener('click', clearSearch);
+
+syncSearchClearBtn();
+searchField.focus();
 loadData();
 loadProceduralData();
 loadMetaData();

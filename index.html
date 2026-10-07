@@ -3,16 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=1360">
-    <title>Законодательная база | Portland</title>
+    <title>Законодательная база | Orlando</title>
+    <link rel="icon" type="image/png" href="favicon.png">
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <!-- Стили и скрипт подключаются с меткой времени: браузер всегда берёт свежие файлы, а не сохранённую копию -->
+    <script>document.write('<link rel="stylesheet" href="style.css?v=' + Date.now() + '">');</script>
 </head>
 <body>
 
     <div class="controls-container">
         <div class="search-wrapper">
-            <input type="text" id="searchInput" placeholder="Опишите ситуацию, введите фразу или номер...">
-            <a class="forum-link" href="https://forum.majestic-rp.ru/forums/zakonodatel-naya-baza.1338/" target="_blank" rel="noopener" title="Перейти на форум с официальной законодательной базой" aria-label="Перейти на форум с официальной законодательной базой">
+            <input type="text" id="searchInput" placeholder="Опишите ситуацию, введите фразу или номер..." autofocus>
+            <button class="search-clear" id="searchClearBtn" type="button" title="Очистить поиск (Esc)" aria-label="Очистить поиск">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M6 6L18 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+                    <path d="M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+                </svg>
+            </button>
+            <a class="forum-link" href="https://forum.majestic-rp.ru/forums/zakonodatel-naya-baza.1405/" target="_blank" rel="noopener" title="Перейти на форум с официальной законодательной базой" aria-label="Перейти на форум с официальной законодательной базой">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M6 18L18 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
                     <path d="M8 6H18V16" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
@@ -21,10 +29,10 @@
         </div>
         <div class="controls-row">
             <div class="tabs">
-                <button class="tab-btn active" data-code="uk">Уголовный кодекс</button>
-                <button class="tab-btn" data-code="ak">Административный кодекс</button> 
-                <button class="tab-btn" data-code="dk">Дорожный кодекс</button>
-                <button class="tab-btn" data-code="pk">Общая информация</button>
+                <button class="tab-btn active" data-code="uk"><span class="tab-full">Уголовный кодекс</span><span class="tab-short">УК</span></button>
+                <button class="tab-btn" data-code="ak"><span class="tab-full">Административный кодекс</span><span class="tab-short">АК</span></button> 
+                <button class="tab-btn" data-code="dk"><span class="tab-full">Дорожный кодекс</span><span class="tab-short">ДК</span></button>
+                <button class="tab-btn" data-code="pk"><span class="tab-full">Общая информация</span><span class="tab-short">Инфо</span></button>
             </div>
             <div class="settings-wrapper">
                 <button class="settings-btn" id="settingsBtn" title="Настройки" aria-haspopup="true" aria-expanded="false">
@@ -42,13 +50,6 @@
                         </div>
                     </div>
                     <div class="settings-divider"></div>
-                    <div class="settings-item">
-                        <span class="settings-item-label">Уведомления тумблеров</span>
-                        <label class="switch">
-                            <input type="checkbox" id="notificationsToggle" checked>
-                            <span class="switch-slider"></span>
-                        </label>
-                    </div>
                     <div class="settings-item">
                         <span class="settings-item-label">Отображение статей</span>
                         <div class="mode-toggle" role="group" aria-label="Переключение режима отображения статей">
@@ -88,8 +89,6 @@
                             </button>
                         </div>
                     </div>
-                    <div class="settings-divider"></div>
-                    <div class="settings-meta-date">Последняя редакция: …</div>
                 </div>
             </div>
         </div>
@@ -120,8 +119,9 @@
             </a>
         </div>
         <div class="footer-signature">Проект от Rezo Toridze</div>
+        <div class="footer-meta-date"></div>
     </footer>
 
-    <script src="script.js"></script>
+    <script>document.write('<script src="script.js?v=' + Date.now() + '"><\/script>');</script>
 </body>
 </html>
