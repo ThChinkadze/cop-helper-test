@@ -872,6 +872,23 @@ function renderArticles({ keepExpanded = false } = {}) {
     } else {
         renderAsCards(container, matchedArticles, query);
     }
+
+    if (!query && currentDisplayMode === 'compact') {
+        const total = parsedDatabase.filter(article => article.code === currentCode).length;
+        if (matchedArticles.length < total) renderCompactHint(container, matchedArticles.length, total);
+    }
+}
+
+// В режиме «Основные» под списком — сколько статей показано и кнопка «Показать все».
+function renderCompactHint(container, shown, total) {
+    const hint = document.createElement('div');
+    hint.className = 'list-hint';
+    hint.innerHTML = `Показаны основные статьи: ${shown} из ${total}. <button type="button" class="list-hint-btn">Показать все</button>`;
+    hint.querySelector('.list-hint-btn').addEventListener('click', () => {
+        setDisplayMode('full');
+        scrollToListTop();
+    });
+    container.appendChild(hint);
 }
 
 function hasFelonyRecord(article) {
@@ -1162,14 +1179,17 @@ const DISPLAY_MODE_TOAST = {
     full: 'Все статьи'
 };
 
-document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', (e) => {
-    const selectedMode = e.currentTarget.getAttribute('data-mode');
+function setDisplayMode(selectedMode) {
     if (selectedMode === currentDisplayMode) return;
     currentDisplayMode = selectedMode;
     localStorage.setItem(DISPLAY_MODE_KEY, currentDisplayMode);
     syncModeToggleUI();
     renderArticles();
     showToast(DISPLAY_MODE_TOAST[currentDisplayMode]);
+}
+
+document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', (e) => {
+    setDisplayMode(e.currentTarget.getAttribute('data-mode'));
 }));
 
 syncModeToggleUI();

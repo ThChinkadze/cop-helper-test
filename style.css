@@ -715,6 +715,34 @@ body {
     gap: 8px;
 }
 
+/* Строка под списком в режиме «Основные»: сколько статей показано и кнопка «Показать все» */
+.list-hint {
+    grid-column: 1 / -1;
+    padding: 10px 0 2px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.list-hint-btn {
+    margin-left: 4px;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-weight: 700;
+    color: var(--text-bright);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.list-hint-btn:hover,
+.list-hint-btn:focus-visible {
+    color: var(--text-title);
+}
+
 .row {
     background-color: var(--card-bg);
     border-radius: 10px;
