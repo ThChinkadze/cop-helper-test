@@ -763,9 +763,10 @@ function attachArticleHandlers(root, article, { stopPropagation = false } = {}) 
 
 // Переиспользует один DOM-элемент между вызовами.
 const TOAST_DURATION_MS = 1800;
+const WELCOME_TOAST_DURATION_MS = 3000;
 let toastEl = null;
 let toastHideTimer = null;
-function showToast(message) {
+function showToast(message, duration = TOAST_DURATION_MS) {
     if (!toastEl) {
         toastEl = document.createElement('div');
         toastEl.className = 'toast';
@@ -781,14 +782,14 @@ function showToast(message) {
 
     toastHideTimer = setTimeout(() => {
         toastEl.classList.remove('toast-visible');
-    }, TOAST_DURATION_MS);
+    }, duration);
 }
 
 // Приветствие — при каждом заходе на страницу.
 let welcomeToastUntil = 0;
 function showWelcomeToast() {
-    welcomeToastUntil = Date.now() + TOAST_DURATION_MS + 300;
-    showToast('Памятка по законодательной базе Orlando');
+    welcomeToastUntil = Date.now() + WELCOME_TOAST_DURATION_MS + 300;
+    showToast('Памятка по законодательной базе Orlando', WELCOME_TOAST_DURATION_MS);
 }
 
 function copyArticleNumber(article) {
