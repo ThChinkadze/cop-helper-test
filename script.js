@@ -425,7 +425,8 @@ function notifyDbDate(dbDate) {
 
     if (localStorage.getItem(DB_DATE_SEEN_KEY) === dbDate) return;
     localStorage.setItem(DB_DATE_SEEN_KEY, dbDate);
-    showToast(`Последняя редакция: ${dbDate}`);
+    // Ждёт, пока скроется приветствие, — иначе заменит его на полуслове.
+    setTimeout(() => showToast(`Последняя редакция: ${dbDate}`), Math.max(0, welcomeToastUntil - Date.now()));
 }
 
 const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -761,6 +762,7 @@ function attachArticleHandlers(root, article, { stopPropagation = false } = {}) 
 // ===== Toast-уведомления =====
 
 // Переиспользует один DOM-элемент между вызовами.
+const TOAST_DURATION_MS = 1800;
 let toastEl = null;
 let toastHideTimer = null;
 function showToast(message) {
@@ -779,7 +781,14 @@ function showToast(message) {
 
     toastHideTimer = setTimeout(() => {
         toastEl.classList.remove('toast-visible');
-    }, 1800);
+    }, TOAST_DURATION_MS);
+}
+
+// Приветствие — при каждом заходе на страницу.
+let welcomeToastUntil = 0;
+function showWelcomeToast() {
+    welcomeToastUntil = Date.now() + TOAST_DURATION_MS + 300;
+    showToast('Памятка по законодательной базе Orlando');
 }
 
 function copyArticleNumber(article) {
@@ -1313,6 +1322,7 @@ if (searchClearBtn) searchClearBtn.addEventListener('click', clearSearch);
 
 syncSearchClearBtn();
 searchField.focus();
+showWelcomeToast();
 loadData();
 loadProceduralData();
 loadMetaData();
