@@ -457,7 +457,7 @@ const SEARCH_ENDINGS = [
     'ала', 'али', 'ало', 'ила', 'или', 'ило', 'ела', 'ели', 'ешь',
     'ах', 'ях', 'ов', 'ев', 'ей', 'ой', 'ий', 'ый', 'ая', 'яя', 'ое', 'ее', 'ые', 'ие', 'ую', 'юю',
     'ом', 'ем', 'ам', 'ям', 'ым', 'им', 'ых', 'их', 'ал', 'ил', 'ел', 'ет', 'ут', 'ют', 'ит', 'ат', 'ят',
-    'ла', 'ли', 'ло',
+    'ла', 'ли', 'ло', 'ть',
     'а', 'я', 'о', 'е', 'ы', 'и', 'у', 'ю', 'ь', 'й', 'л'
 ].sort((a, b) => b.length - a.length);
 
@@ -471,14 +471,26 @@ function splitSearchWords(str) {
     return normalizeSearchText(str).match(SEARCH_WORD_RE) || [];
 }
 
-function stemSearchWord(word) {
-    if (word.length <= SEARCH_MIN_STEM || /\d/.test(word)) return word;
+function cutSearchEnding(word, minStem) {
     for (const ending of SEARCH_ENDINGS) {
-        if (word.endsWith(ending) && word.length - ending.length >= SEARCH_MIN_STEM) {
+        if (word.endsWith(ending) && word.length - ending.length >= minStem) {
             return word.slice(0, -ending.length);
         }
     }
-    return word;
+    return null;
+}
+
+// stem — основа слова: по возможности от четырёх букв («избил» — «изби», а не «изб»).
+// short — запасная, более короткая основа: ловит чередования («превысил» — «превышение», «курил» — «курение»).
+function searchStems(word) {
+    if (word.length <= SEARCH_MIN_STEM || /\d/.test(word)) return { stem: word, short: '' };
+    const long = cutSearchEnding(word, SEARCH_MIN_STEM + 1);
+    const any = cutSearchEnding(word, SEARCH_MIN_STEM);
+    const stem = long || any || word;
+    let short = '';
+    if (long && any && any.length < long.length) short = any;
+    else if (stem.length >= 5) short = stem.slice(0, -1);
+    return { stem, short };
 }
 
 // words — слова, numbers — номера статей, parts — "ч.N", codes — фильтр по кодексу.
@@ -490,20 +502,26 @@ function parseSearchQuery(raw, { allowCodes = true } = {}) {
         .replace(/(\d)(ч\.)/g, '$1 $2')
         .replace(/(^|[^a-zа-я0-9])ч\.?\s*(\d+)/g, '$1ч.$2');
 
+    // «не» перед словом запоминается: «не остановился» находит и «неостановка».
+    let afterNot = false;
     text.split(/[\s,;]+/).forEach(chunk => {
         const token = chunk.replace(/^[^a-zа-я0-9]+|[^a-zа-я0-9]+$/g, '');
         if (!token) return;
 
         if (/^\d+(\.\d+)*$/.test(token)) {
             if (!query.numbers.includes(token)) query.numbers.push(token);
+            afterNot = false;
             return;
         }
         if (/^ч\.\d+$/.test(token)) {
             if (!query.parts.includes(token)) query.parts.push(token);
+            afterNot = false;
             return;
         }
 
         (token.match(SEARCH_WORD_RE) || []).forEach(piece => {
+            const negated = afterNot;
+            afterNot = piece === 'не';
             if (allowCodes && SEARCH_CODE_ALIASES[piece]) {
                 const code = SEARCH_CODE_ALIASES[piece];
                 if (!query.codes.includes(code)) query.codes.push(code);
@@ -516,7 +534,7 @@ function parseSearchQuery(raw, { allowCodes = true } = {}) {
             }
             if (piece.length < 2) return;
             if (query.words.some(w => w.full === piece)) return;
-            query.words.push({ full: piece, stem: stemSearchWord(piece), minLevel: 1 });
+            query.words.push({ full: piece, ...searchStems(piece), negated, minLevel: 1 });
         });
     });
 
@@ -532,10 +550,21 @@ function searchWordLevel(word, token) {
     const stem = token.stem;
     if (stem.length < SEARCH_MIN_STEM) return word === token.full ? 2 : 0;
     const at = word.indexOf(stem);
-    if (at === -1) return 0;
-    const shortTail = word.length - at - stem.length <= Math.max(5, stem.length);
-    if (at === 0) return shortTail ? 2 : 1;
-    return (stem.length >= 4 && at <= 3 && shortTail) ? 1 : 0;
+    if (at !== -1) {
+        const tail = word.length - at - stem.length;
+        const shortTail = tail <= Math.max(5, stem.length);
+        // Основа из трёх букв считается тем же словом только при коротком окончании: «дал» — не «дальний».
+        if (at === 0) return (shortTail && (stem.length > SEARCH_MIN_STEM || tail <= 3)) ? 2 : 1;
+        if (stem.length >= 4 && at <= 3 && shortTail) return 1;
+    }
+    const short = token.short;
+    if (short && word.startsWith(short) && word.length - short.length <= Math.max(6, short.length + 1)) return 1;
+    return 0;
+}
+
+// Слово с приставкой «не»: «неостановка» для запроса «не остановился».
+function isNegatedWord(word, token) {
+    return word.startsWith('не' + (token.short || token.stem));
 }
 
 function bestWordLevel(words, token) {
@@ -554,10 +583,22 @@ const SEARCH_WEIGHTS = {
     tags: [0, 4, 7],
     desc: [0, 2, 5]
 };
-const SEARCH_NUM_EXACT = 100;
-const SEARCH_NUM_CHILD = 60;
-const SEARCH_NUM_PART = 50;
+// Номер статьи весит больше любого слова.
+const SEARCH_NUM_EXACT = 1000;
+const SEARCH_NUM_CHILD = 600;
+const SEARCH_NUM_PART = 500;
 const SEARCH_NUM_IN_TEXT = 2;
+
+// Редкое слово запроса весит больше частого: вес = (число записей / число записей со словом) в этой степени.
+const SEARCH_RARITY_POWER = 0.35;
+// Слову с основой из трёх букв вес редкости ограничен: такие совпадения часто случайны.
+const SEARCH_SHORT_STEM_WEIGHT = 2;
+// Слово с «не» («неостановка» для «не остановился») ценится в полтора раза выше обычного совпадения.
+const SEARCH_NEGATED_BOOST = 1.5;
+// Надбавка каждому слову запроса, если несколько слов нашлись в одном теге («езда без прав»).
+const SEARCH_PHRASE_BONUS = 3;
+// Статья, где нашлись не все слова, показывается рядом с полными совпадениями, если набрала такую долю лучшего счёта.
+const SEARCH_PARTIAL_SHARE = 0.8;
 
 // Родственные слова учитываются, только если само слово встречается реже этого числа записей.
 const SEARCH_RELATED_LIMIT = 3;
@@ -575,6 +616,7 @@ function getArticleSearchIndex(article) {
             numBase: (num.match(NUM_BASE_RE) || [''])[0],
             title: splitSearchWords(article.title),
             tags: splitSearchWords(article.tags),
+            tagGroups: String(article.tags).split(',').map(splitSearchWords).filter(group => group.length > 1),
             desc: splitSearchWords(article.desc)
         };
         searchIndexCache.set(article, index);
@@ -590,6 +632,7 @@ function getProceduralSearchIndex(item) {
             numBase: '',
             title: splitSearchWords(item.title),
             tags: [],
+            tagGroups: [],
             desc: splitSearchWords(item.content)
         };
         searchIndexCache.set(item, index);
@@ -607,8 +650,22 @@ function numberScore(index, number, allowInText) {
     return 0;
 }
 
-// entries: [{ item, index, tie }]. Сначала записи, где нашлись все слова запроса;
-// если таких нет — где нашлась хотя бы часть.
+// Надбавка за фразу: несколько слов запроса в одном теге.
+function phraseBonus(index, words, weights) {
+    let best = 0;
+    index.tagGroups.forEach(group => {
+        let count = 0;
+        let sum = 0;
+        words.forEach((token, i) => {
+            if (bestWordLevel(group, token) === 2) { count += 1; sum += weights[i]; }
+        });
+        if (count >= 2 && sum > best) best = sum;
+    });
+    return best * SEARCH_PHRASE_BONUS;
+}
+
+// entries: [{ item, index, tie }]. Порядок — по счёту: редкое слово запроса весит больше частого.
+// Показываются записи со всеми словами запроса и близкие к лучшей по счёту; если полных нет — все найденные.
 function rankBySearch(entries, query) {
     const levels = entries.map(entry => query.words.map(token => [
         bestWordLevel(entry.index.title, token),
@@ -616,9 +673,15 @@ function rankBySearch(entries, query) {
         bestWordLevel(entry.index.desc, token)
     ]));
 
-    query.words.forEach((token, i) => {
+    // Если самого слова нет ни в одной записи, родственные слова засчитываются как оно само.
+    const onlyRelated = [];
+    const weights = query.words.map((token, i) => {
         const exactCount = levels.filter(entryLevels => Math.max(...entryLevels[i]) === 2).length;
         token.minLevel = exactCount < SEARCH_RELATED_LIMIT ? 1 : 2;
+        onlyRelated[i] = exactCount === 0;
+        const found = exactCount || levels.filter(entryLevels => Math.max(...entryLevels[i]) === 1).length || 1;
+        const weight = Math.pow(entries.length / found, SEARCH_RARITY_POWER);
+        return token.stem.length <= SEARCH_MIN_STEM ? Math.min(weight, SEARCH_SHORT_STEM_WEIGHT) : weight;
     });
 
     const numberInText = query.numbers.map(number =>
@@ -626,31 +689,40 @@ function rankBySearch(entries, query) {
 
     const results = [];
     entries.forEach((entry, order) => {
+        const index = entry.index;
         let matched = 0;
         let score = 0;
 
         query.numbers.forEach((number, i) => {
-            const value = numberScore(entry.index, number, numberInText[i]);
+            const value = numberScore(index, number, numberInText[i]);
             if (value) { matched += 1; score += value; }
         });
 
         query.parts.forEach(part => {
-            if (` ${entry.index.num} `.includes(` ${part} `)) { matched += 1; score += SEARCH_NUM_PART; }
+            if (` ${index.num} `.includes(` ${part} `)) { matched += 1; score += SEARCH_NUM_PART; }
         });
 
         query.words.forEach((token, i) => {
-            const [title, tags, desc] = levels[order][i].map(level => (level < token.minLevel ? 0 : level));
-            const value = Math.max(SEARCH_WEIGHTS.title[title], SEARCH_WEIGHTS.tags[tags], SEARCH_WEIGHTS.desc[desc]);
-            if (value) { matched += 1; score += value; }
+            const [title, tags, desc] = levels[order][i].map(level =>
+                (level < token.minLevel ? 0 : (onlyRelated[i] && level ? 2 : level)));
+            let value = Math.max(SEARCH_WEIGHTS.title[title], SEARCH_WEIGHTS.tags[tags], SEARCH_WEIGHTS.desc[desc]);
+            if (token.negated) {
+                const field = ['title', 'tags', 'desc'].find(name => index[name].some(word => isNegatedWord(word, token)));
+                if (field) value = Math.max(value, SEARCH_WEIGHTS[field][2] * SEARCH_NEGATED_BOOST);
+            }
+            if (value) { matched += 1; score += value * weights[i]; }
         });
 
         if (query.total > 0 && matched === 0) return;
+        if (query.words.length > 1) score += phraseBonus(index, query.words, weights);
         results.push({ item: entry.item, matched, score, order, tie: entry.tie });
     });
 
-    const complete = results.filter(r => r.matched === query.total);
-    return (complete.length ? complete : results)
-        .sort((a, b) => (b.matched - a.matched) || (b.score - a.score) || (a.tie - b.tie) || (a.order - b.order))
+    const hasComplete = results.some(r => r.matched === query.total);
+    const top = results.reduce((max, r) => Math.max(max, r.score), 0);
+    return results
+        .filter(r => !hasComplete || r.matched === query.total || r.score >= top * SEARCH_PARTIAL_SHARE)
+        .sort((x, y) => (y.score - x.score) || (x.tie - y.tie) || (x.order - y.order))
         .map(r => r.item);
 }
 
@@ -694,7 +766,8 @@ function highlightText(text, query) {
     for (const match of normalized.matchAll(SEARCH_WORD_RE)) {
         const word = match[0];
         const isHit = query.numbers.includes(word) ||
-            query.words.some(token => searchWordLevel(word, token) >= token.minLevel);
+            query.words.some(token => searchWordLevel(word, token) >= token.minLevel ||
+                (token.negated && isNegatedWord(word, token)));
         if (isHit) ranges.push([match.index, match.index + word.length]);
     }
     return wrapHighlightRanges(text, ranges);
