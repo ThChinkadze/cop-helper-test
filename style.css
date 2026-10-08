@@ -715,6 +715,14 @@ body {
     gap: 8px;
 }
 
+/* Примеры запросов под сообщением «ничего не найдено» */
+.loader-hint {
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
 /* Строка под списком в режиме «Основные»: сколько статей показано и кнопка «Показать все» */
 .list-hint {
     grid-column: 1 / -1;

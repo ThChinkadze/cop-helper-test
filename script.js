@@ -807,7 +807,7 @@ function copyArticleNumber(article) {
     }
 
     navigator.clipboard.writeText(text)
-        .then(() => showToast('Скопировано'))
+        .then(() => showToast(`Скопировано: ${text}`))
         .catch(onFail);
 }
 
@@ -863,7 +863,10 @@ function renderArticles({ keepExpanded = false } = {}) {
     container.className = currentView === 'list' ? 'list-view' : '';
 
     if (matchedArticles.length === 0) {
-        container.innerHTML = `<div class="loader">По запросу ничего не найдено. Попробуйте описать иначе.</div>`;
+        const examplesHtml = query
+            ? '<div class="loader-hint">Можно искать по номеру (12.8), по слову (кража) или по ситуации (угнал машину).</div>'
+            : '';
+        container.innerHTML = `<div class="loader">По запросу ничего не найдено. Попробуйте описать иначе.${examplesHtml}</div>`;
         return;
     }
 
@@ -1003,8 +1006,8 @@ function renderAsList(container, matchedArticles, query, expandedIds) {
             <div class="row-title" title="${escapeHtml(article.title)}">${buildPinButton(article, 14)}${highlightedTitle}</div>
         `;
 
-        // УК — штраф/звёзды/арест; АК и ДК — доп. мера/штраф, звёзды и арест — только если заполнены.
-        // row-slot-* держат ширину.
+        // УК — штраф/звёзды/арест, доп. мера — только если заполнена.
+        // АК и ДК — доп. мера/штраф, звёзды и арест — только если заполнены. row-slot-* держат ширину.
         let rightHtml = '';
         if (article.code === 'uk') {
             const safeFine = escapeHtml(article.fine);
@@ -1013,8 +1016,14 @@ function renderAsList(container, matchedArticles, query, expandedIds) {
             const arrestTitle = safeArrest
                 ? `${safeArrest}, ${hasFelony ? 'судимость' : 'без судимости'}`
                 : 'Арест';
+            // Доп. мера у статьи УК: плашка слева от штрафа, остальные колонки не сдвигаются.
+            const safeExtraMeasure = escapeHtml(article.extraMeasure);
+            const extraHtml = safeExtraMeasure
+                ? `<div class="row-tag row-slot-extra" title="${safeExtraMeasure}">${safeExtraMeasure}</div>`
+                : '';
 
             rightHtml = `
+                ${extraHtml}
                 <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="${safeFine ? `Штраф: ${safeFine}` : 'Штраф'}">${safeFine || '—'}</div>
                 ${buildStarsTag(article)}
                 <div class="row-tag row-slot-arrest ${hasFelony ? 'row-danger' : ''}" title="${arrestTitle}">${safeArrest || '—'}</div>
