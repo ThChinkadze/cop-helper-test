@@ -824,9 +824,10 @@ function swapLayout(text, from, to) {
 }
 
 // Слова запроса короче TYPO_MIN_LENGTH не исправляются («торт» не должен стать «торсом»);
-// от TYPO_LONG_WORD букв допускаются две ошибки вместо одной. Основы и слова базы сравниваются от TYPO_MIN_STEM букв.
+// от TYPO_LONG_WORD букв допускаются две ошибки вместо одной. Основы сравниваются от TYPO_MIN_STEM букв:
+// на четырёх буквах разные слова слишком похожи («рация» становилась «ранил»).
 const TYPO_MIN_LENGTH = 5;
-const TYPO_MIN_STEM = 4;
+const TYPO_MIN_STEM = 5;
 const TYPO_LONG_WORD = 8;
 
 // Словарь слов базы: слово → основа и число записей с ним; fixes — уже найденные исправления.
@@ -887,7 +888,7 @@ function findTypoFix(token, vocab) {
     if (!known) {
         const max = token.full.length >= TYPO_LONG_WORD ? 2 : 1;
         vocab.words.forEach((entry, word) => {
-            if (word.length < TYPO_MIN_STEM || /\d/.test(word) || word[0] !== token.full[0]) return;
+            if (word.length < TYPO_MIN_LENGTH - 1 || /\d/.test(word) || word[0] !== token.full[0]) return;
             let distance = editDistance(token.full, word, max);
             if (token.stem.length >= TYPO_MIN_STEM && entry.stem.length >= TYPO_MIN_STEM) {
                 distance = Math.min(distance, editDistance(token.stem, entry.stem, max));
@@ -931,6 +932,8 @@ function findWithFixes(raw, parseOptions, items, getIndex, search) {
         const swapped = swapLayout(text, from, to);
         if (swapped === text) continue;
         const next = attempt(swapped);
+        // Начало русского слова не должно превращаться в обозначение кодекса («вл» → «dk»).
+        if (to === LAYOUT_EN && next.query.total === 0) continue;
         if (next.results.length) return next;
     }
     return first;
@@ -1764,13 +1767,16 @@ function restoreKeyboardSelection() {
     else keyboardSelectedId = null;
 }
 
+// Набранный запрос применяется сразу, без ожидания паузы после ввода: иначе клавиша сработала бы
+// по прежнему списку, а через мгновение он бы сменился.
+function applyPendingSearch() {
+    clearTimeout(searchDebounceTimer);
+    if (searchField.value !== renderedSearchText) renderArticles();
+}
+
 // Переход по кнопкам строки «Найдено» стрелками влево и вправо; после перехода выбрана первая статья выдачи.
 // Возвращает false, если строки «Найдено» нет.
 function shiftFoundCategory(step) {
-    // Набранный запрос применяется сразу, без ожидания паузы после ввода.
-    clearTimeout(searchDebounceTimer);
-    if (searchField.value !== renderedSearchText) renderArticles();
-
     const chips = Array.from(document.querySelectorAll('#articlesContainer .found-chip'));
     if (chips.length === 0) return false;
     const next = chips[chips.findIndex(chip => chip.classList.contains('active')) + step];
@@ -1821,7 +1827,9 @@ searchField.addEventListener('mousedown', () => selectByKeyboard(null));
 // Ctrl+C копирует номер статьи, выбранной стрелками. Если выделен текст — в поле поиска или на странице —
 // копируется он, как обычно. Клавиша определяется по положению (KeyC), раскладка не важна.
 document.addEventListener('keydown', (e) => {
-    if (e.code !== 'KeyC' || !e.ctrlKey || e.altKey || e.shiftKey || !keyboardSelectedId) return;
+    if (e.code !== 'KeyC' || !e.ctrlKey || e.altKey || e.shiftKey) return;
+    applyPendingSearch();
+    if (!keyboardSelectedId) return;
     if (document.activeElement === searchField && searchField.selectionStart !== searchField.selectionEnd) return;
     if (String(window.getSelection()) !== '') return;
     const article = parsedDatabase.find(item => articleId(item) === keyboardSelectedId);
@@ -1847,6 +1855,8 @@ document.addEventListener('keydown', (e) => {
 
     const inSearch = e.target === searchField;
     if (!inSearch && e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]')) return;
+
+    applyPendingSearch();
 
     // Фокус уходит с кнопки или строки, чтобы следующий пробел раскрыл описание, а не нажал её.
     const releaseFocus = () => {
