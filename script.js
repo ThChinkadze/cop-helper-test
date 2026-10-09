@@ -30,6 +30,8 @@ let keyboardSelectedId = null;
 let renderedSearchText = '';
 // Показана ли сейчас выдача поиска (а не обычный список статей кодекса).
 let listShowsSearch = false;
+// В плитках: стрелки влево и вправо заняты строкой «Найдено», хотя статья не выбрана.
+let foundRowKeysActive = false;
 
 // ===== Вид отображения (плитки/список) =====
 const VIEW_KEY = STORAGE_PREFIX + 'view_mode';
@@ -1119,7 +1121,10 @@ function renderArticles({ keepExpanded = false } = {}) {
     const rawQuery = document.getElementById('searchInput').value;
     renderedSearchText = rawQuery;
     listShowsSearch = false;
-    if (!keepExpanded) keyboardSelectedId = null;
+    if (!keepExpanded) {
+        keyboardSelectedId = null;
+        foundRowKeysActive = false;
+    }
 
     const tabs = document.querySelector('.tabs');
     tabs.classList.remove('searching');
@@ -1775,6 +1780,7 @@ function applyPendingSearch() {
 }
 
 // Переход по кнопкам строки «Найдено» стрелками влево и вправо; после перехода выбрана первая статья выдачи.
+// В плитках статья не выбирается: иначе следующая стрелка досталась бы плиткам, а не строке «Найдено».
 // Возвращает false, если строки «Найдено» нет.
 function shiftFoundCategory(step) {
     const chips = Array.from(document.querySelectorAll('#articlesContainer .found-chip'));
@@ -1783,7 +1789,8 @@ function shiftFoundCategory(step) {
     if (next) {
         searchCodeFilter = next.dataset.code || null;
         renderArticles();
-        selectByKeyboard(articleElements()[0] || null);
+        if (currentView === 'grid') foundRowKeysActive = true;
+        else selectByKeyboard(articleElements()[0] || null);
         scrollToListTop();
     }
     return true;
@@ -1822,7 +1829,10 @@ zoomMinusBtn.title = 'Уменьшить (←)';
 zoomPlusBtn.title = 'Увеличить (→)';
 
 // Щелчок по полю поиска снимает выбор статьи: стрелки влево и вправо снова двигают курсор по тексту.
-searchField.addEventListener('mousedown', () => selectByKeyboard(null));
+searchField.addEventListener('mousedown', () => {
+    selectByKeyboard(null);
+    foundRowKeysActive = false;
+});
 
 // Ctrl+C копирует номер статьи, выбранной стрелками. Если выделен текст — в поле поиска или на странице —
 // копируется он, как обычно. Клавиша определяется по положению (KeyC), раскладка не важна.
@@ -1877,20 +1887,22 @@ document.addEventListener('keydown', (e) => {
         const caretAtEdge = step === 1
             ? searchField.selectionStart === searchField.value.length
             : searchField.selectionEnd === 0;
-        if (inSearch && !keyboardSelectedId && !caretAtEdge) return;
+        if (inSearch && !keyboardSelectedId && !foundRowKeysActive && !caretAtEdge) return;
 
-        // В плитках стрелки влево и вправо переходят на соседнюю плитку.
+        // В плитках, когда плитка выбрана стрелками, влево и вправо переходят на соседнюю плитку.
+        // Пока выбора нет, они переключают вкладки и кодексы, как в списке.
         if (currentView === 'grid' && currentCode !== 'pk') {
             const items = articleElements();
             const at = items.findIndex(item => item.dataset.articleId === keyboardSelectedId);
-            if (items.length === 0 || (at === -1 && (step === -1 || e.repeat))) return;
-            e.preventDefault();
-            releaseFocus();
-            selectByKeyboard(items[Math.min(Math.max(at + step, 0), items.length - 1)]);
-            return;
+            if (at !== -1) {
+                e.preventDefault();
+                releaseFocus();
+                selectByKeyboard(items[Math.min(Math.max(at + step, 0), items.length - 1)]);
+                return;
+            }
         }
 
-        // В списке: без поиска — соседняя вкладка, при поиске — соседний кодекс в строке «Найдено».
+        // Без поиска — соседняя вкладка, при поиске — соседний кодекс в строке «Найдено».
         // Удержание клавиши не считается, чтобы не проскочить несколько вкладок подряд.
         if (e.repeat) return;
         if (searchField.value === '') {
