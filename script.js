@@ -2,6 +2,11 @@
 const SHEET_ID = '1y4PKeW4sTxnQhJJ7nlO2coCZPdRbUKjC28KQkpMidrs';
 const STORAGE_PREFIX = 'majestic_orlando_';
 
+// Уборка за прежней версией сайта (сервер Portland): её сохранённые данные больше не читаются.
+Object.keys(localStorage)
+    .filter(key => key.startsWith('majestic_portland_'))
+    .forEach(key => localStorage.removeItem(key));
+
 // ===== Настройки Google Sheets =====
 function sheetUrl(sheetName) {
     return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(sheetName)}&headers=0`;
@@ -16,6 +21,15 @@ let parsedDatabase = [];
 let proceduralData = [];
 let currentCode = "uk";
 let searchDebounceTimer;
+
+// Во время поиска: кодекс, которым ограничена выдача (null — все кодексы).
+let searchCodeFilter = null;
+
+// Статья, выбранная стрелками с клавиатуры, и текст запроса, по которому построена выдача.
+let keyboardSelectedId = null;
+let renderedSearchText = '';
+// Показана ли сейчас выдача поиска (а не обычный список статей кодекса).
+let listShowsSearch = false;
 
 // ===== Вид отображения (плитки/список) =====
 const VIEW_KEY = STORAGE_PREFIX + 'view_mode';
@@ -52,6 +66,55 @@ function loadPinnedArticles() {
 
 function articleId(article) {
     return `${article.code}::${article.num}`;
+}
+
+// ===== Недавно скопированные статьи =====
+const RECENT_KEY = STORAGE_PREFIX + 'recent_copied';
+const RECENT_LIMIT = 5;
+let recentCopied = loadRecentCopied();
+
+function loadRecentCopied() {
+    try {
+        const raw = JSON.parse(localStorage.getItem(RECENT_KEY));
+        return Array.isArray(raw) ? raw.filter(id => typeof id === 'string').slice(0, RECENT_LIMIT) : [];
+    } catch {
+        return [];
+    }
+}
+
+function rememberCopied(article) {
+    const id = articleId(article);
+    recentCopied = [id, ...recentCopied.filter(other => other !== id)].slice(0, RECENT_LIMIT);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recentCopied));
+    renderRecentRow();
+}
+
+// Строка «Недавно скопированные» над списком статей; при поиске и на «Общей информации» её нет.
+// Нажатие на номер копирует его снова, порядок в строке при этом не меняется.
+function renderRecentRow() {
+    const container = document.getElementById('articlesContainer');
+    const old = container.querySelector('.recent-row');
+    if (old) old.remove();
+    if (currentCode === 'pk' || articlesLoadState !== 'ready' || listShowsSearch) return;
+
+    const articles = recentCopied
+        .map(id => parsedDatabase.find(article => articleId(article) === id))
+        .filter(Boolean);
+    if (articles.length === 0) return;
+
+    const row = document.createElement('div');
+    row.className = 'recent-row';
+    row.innerHTML = '<span class="recent-label">Недавно скопированные:</span>';
+    articles.forEach(article => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'badge-num recent-chip';
+        chip.textContent = `ст. ${article.num} ${CODE_LABELS[article.code] || ''}`.trim();
+        chip.title = `${article.title} — скопировать номер`;
+        chip.addEventListener('click', () => copyArticleNumber(article, { remember: false }));
+        row.appendChild(chip);
+    });
+    container.prepend(row);
 }
 
 function isPinned(article) {
@@ -742,6 +805,137 @@ function searchProceduralCards(query) {
     return rankBySearch(entries, query);
 }
 
+// ===== Поиск: опечатки и раскладка клавиатуры =====
+
+// Клавиши английской раскладки и русские буквы на тех же клавишах.
+const LAYOUT_EN = "`qwertyuiop[]asdfghjkl;'zxcvbnm,.{}:\"<>~";
+const LAYOUT_RU = "ёйцукенгшщзхъфывапролджэячсмитьбюхъжэбюё";
+
+// Перевод в другую раскладку — только для кусков, где есть буквы исходной: «12.8» не трогается.
+function swapLayout(text, from, to) {
+    const letters = from === LAYOUT_EN ? /[a-z]/ : /[а-яё]/;
+    return text.split(/(\s+)/).map(chunk => {
+        if (!letters.test(chunk)) return chunk;
+        return Array.from(chunk, ch => {
+            const at = from.indexOf(ch);
+            return at === -1 ? ch : to[at];
+        }).join('');
+    }).join('');
+}
+
+// Слова запроса короче TYPO_MIN_LENGTH не исправляются («торт» не должен стать «торсом»);
+// от TYPO_LONG_WORD букв допускаются две ошибки вместо одной. Основы и слова базы сравниваются от TYPO_MIN_STEM букв.
+const TYPO_MIN_LENGTH = 5;
+const TYPO_MIN_STEM = 4;
+const TYPO_LONG_WORD = 8;
+
+// Словарь слов базы: слово → основа и число записей с ним; fixes — уже найденные исправления.
+// Пересоздаётся при обновлении данных.
+const searchVocabCache = new WeakMap();
+
+function getSearchVocab(items, getIndex) {
+    let vocab = searchVocabCache.get(items);
+    if (!vocab) {
+        vocab = { words: new Map(), fixes: new Map() };
+        items.forEach(item => {
+            const index = getIndex(item);
+            new Set([...index.title, ...index.tags, ...index.desc]).forEach(word => {
+                const entry = vocab.words.get(word);
+                if (entry) entry.count += 1;
+                else vocab.words.set(word, { stem: searchStems(word).stem, count: 1 });
+            });
+        });
+        searchVocabCache.set(items, vocab);
+    }
+    return vocab;
+}
+
+// Число правок между словами: вставка, удаление, замена, перестановка соседних букв. Больше max — не считается.
+function editDistance(a, b, max) {
+    if (Math.abs(a.length - b.length) > max) return max + 1;
+    let prev2 = null;
+    let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+        const row = [i];
+        let best = i;
+        for (let j = 1; j <= b.length; j++) {
+            let value = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+            if (prev2 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+                value = Math.min(value, prev2[j - 2] + 1);
+            }
+            row.push(value);
+            if (value < best) best = value;
+        }
+        if (best > max) return max + 1;
+        prev2 = prev;
+        prev = row;
+    }
+    return prev[b.length];
+}
+
+// Ближайшее слово базы для слова запроса, которого в базе нет ни в каком виде: «крожа» → «кража».
+function findTypoFix(token, vocab) {
+    if (token.full.length < TYPO_MIN_LENGTH || /\d/.test(token.full) || vocab.words.has(token.full)) return null;
+    if (vocab.fixes.has(token.full)) return vocab.fixes.get(token.full);
+
+    let known = false;
+    for (const word of vocab.words.keys()) {
+        if (searchWordLevel(word, token) > 0) { known = true; break; }
+    }
+
+    let best = null;
+    if (!known) {
+        const max = token.full.length >= TYPO_LONG_WORD ? 2 : 1;
+        vocab.words.forEach((entry, word) => {
+            if (word.length < TYPO_MIN_STEM || /\d/.test(word) || word[0] !== token.full[0]) return;
+            let distance = editDistance(token.full, word, max);
+            if (token.stem.length >= TYPO_MIN_STEM && entry.stem.length >= TYPO_MIN_STEM) {
+                distance = Math.min(distance, editDistance(token.stem, entry.stem, max));
+            }
+            if (distance > max) return;
+            if (!best || distance < best.distance || (distance === best.distance && entry.count > best.count)) {
+                best = { word, distance, count: entry.count };
+            }
+        });
+    }
+
+    const fix = best ? best.word : null;
+    vocab.fixes.set(token.full, fix);
+    return fix;
+}
+
+function fixQueryTypos(query, vocab) {
+    const fixed = [];
+    query.words.forEach(token => {
+        const fix = findTypoFix(token, vocab);
+        const result = fix ? { ...token, full: fix, ...searchStems(fix) } : token;
+        if (!fixed.some(other => other.full === result.full)) fixed.push(result);
+    });
+    query.words = fixed;
+    query.total = query.words.length + query.numbers.length + query.parts.length;
+}
+
+// Поиск с запасными попытками: сначала исправляются опечатки, при пустой выдаче пробуется другая раскладка.
+function findWithFixes(raw, parseOptions, items, getIndex, search) {
+    const attempt = text => {
+        const query = parseSearchQuery(text, parseOptions);
+        if (query.words.length) fixQueryTypos(query, getSearchVocab(items, getIndex));
+        return { query, results: query.active ? search(query) : [] };
+    };
+
+    const first = attempt(raw);
+    if (!first.query.active || first.results.length) return first;
+
+    const text = String(raw).toLowerCase();
+    for (const [from, to] of [[LAYOUT_EN, LAYOUT_RU], [LAYOUT_RU, LAYOUT_EN]]) {
+        const swapped = swapLayout(text, from, to);
+        if (swapped === text) continue;
+        const next = attempt(swapped);
+        if (next.results.length) return next;
+    }
+    return first;
+}
+
 // ===== Поиск: подсветка =====
 
 function wrapHighlightRanges(text, ranges) {
@@ -865,7 +1059,7 @@ function showWelcomeToast() {
     showToast('Памятка по законодательной базе Orlando', WELCOME_TOAST_DURATION_MS);
 }
 
-function copyArticleNumber(article) {
+function copyArticleNumber(article, { remember = true } = {}) {
     const codeLabel = CODE_LABELS[article.code] || '';
     const text = `ст. ${article.num} ${codeLabel}`.trim();
 
@@ -880,23 +1074,57 @@ function copyArticleNumber(article) {
     }
 
     navigator.clipboard.writeText(text)
-        .then(() => showToast(`Скопировано: ${text}`))
+        .then(() => {
+            showToast(`Скопировано: ${text}`);
+            if (remember) rememberCopied(article);
+        })
         .catch(onFail);
 }
 
 // ===== Основной рендер =====
 
+// Строка «Найдено» над выдачей поиска: сколько статей в каждом кодексе и отбор по кодексу.
+// Показывается, только когда найденное лежит в нескольких кодексах.
+function renderFoundRow(container, counts) {
+    const codes = Object.keys(CODE_LABELS).filter(code => counts[code]);
+    if (codes.length < 2) return;
+
+    const total = codes.reduce((sum, code) => sum + counts[code], 0);
+    const row = document.createElement('div');
+    row.className = 'found-row';
+    row.innerHTML = '<span class="found-label">Найдено:</span>'
+        + `<button type="button" class="found-chip" data-code="" title="Показать всё найденное">Все ${total}</button>`
+        + codes.map(code => `<button type="button" class="found-chip" data-code="${code}" title="Показать только найденное в ${CODE_LABELS[code]}"><span class="found-code ${code}">${CODE_LABELS[code]}</span>${counts[code]}</button>`).join('');
+
+    row.querySelectorAll('.found-chip').forEach(chip => {
+        const code = chip.dataset.code || null;
+        const isActive = code === searchCodeFilter;
+        chip.classList.toggle('active', isActive);
+        chip.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        chip.addEventListener('click', () => {
+            if (code === searchCodeFilter) return;
+            searchCodeFilter = code;
+            renderArticles();
+        });
+    });
+    container.prepend(row);
+}
+
 function renderArticles({ keepExpanded = false } = {}) {
     const container = document.getElementById('articlesContainer');
 
     const rawQuery = document.getElementById('searchInput').value;
+    renderedSearchText = rawQuery;
+    listShowsSearch = false;
+    if (!keepExpanded) keyboardSelectedId = null;
 
     const tabs = document.querySelector('.tabs');
     tabs.classList.remove('searching');
 
     // На вкладке "Общая информация" поиск идёт только по её карточкам.
     if (currentCode === 'pk') {
-        const pkQuery = parseSearchQuery(rawQuery, { allowCodes: false });
+        const pkQuery = findWithFixes(rawQuery, { allowCodes: false },
+            proceduralData, getProceduralSearchIndex, searchProceduralCards).query;
         container.className = '';
         renderProceduralCards(container, pkQuery.active ? pkQuery : null);
         return;
@@ -908,14 +1136,23 @@ function renderArticles({ keepExpanded = false } = {}) {
         return;
     }
 
-    const parsedQuery = parseSearchQuery(rawQuery);
-    const query = parsedQuery.active ? parsedQuery : null;
+    const found = findWithFixes(rawQuery, {}, parsedDatabase, getArticleSearchIndex, searchArticles);
+    const query = found.query.active ? found.query : null;
+    listShowsSearch = Boolean(query);
+
     tabs.classList.toggle('searching', Boolean(query));
+
+    // Сколько статей найдено в каждом кодексе; отбор по кодексу снимается, если в нём ничего не нашлось.
+    const counts = {};
+    if (query) found.results.forEach(({ article }) => { counts[article.code] = (counts[article.code] || 0) + 1; });
+    if (!counts[searchCodeFilter]) searchCodeFilter = null;
 
     let matchedArticles = [];
 
     if (query) {
-        matchedArticles = searchArticles(query);
+        matchedArticles = searchCodeFilter
+            ? found.results.filter(({ article }) => article.code === searchCodeFilter)
+            : found.results;
     } else {
         parsedDatabase.forEach(article => {
             if (article.code !== currentCode) return;
@@ -948,6 +1185,9 @@ function renderArticles({ keepExpanded = false } = {}) {
     } else {
         renderAsCards(container, matchedArticles, query);
     }
+    restoreKeyboardSelection();
+    renderRecentRow();
+    if (query) renderFoundRow(container, counts);
 
     if (!query && currentDisplayMode === 'compact') {
         const total = parsedDatabase.filter(article => article.code === currentCode).length;
@@ -1017,6 +1257,7 @@ function renderAsCards(container, matchedArticles, query) {
 
         const card = document.createElement('div');
         card.className = `card ${article.code} ${isPinned(article) ? 'pinned' : ''}`;
+        card.dataset.articleId = articleId(article);
 
         const { title: highlightedTitle, num: highlightedNum, desc: highlightedDesc } =
             buildHighlightedFields(article, query);
@@ -1053,109 +1294,183 @@ function renderAsCards(container, matchedArticles, query) {
     });
 }
 
+// ===== Другие части статьи =====
+
+// Статьи с тем же номером до «ч.»: для «6.1 ч.1» это «6.1 ч.2» и «6.1 ч.3».
+const articleGroupsCache = new WeakMap();
+
+function articleBaseNum(article) {
+    return (article.num.match(NUM_BASE_RE) || [''])[0];
+}
+
+function articleSiblings(article) {
+    let groups = articleGroupsCache.get(parsedDatabase);
+    if (!groups) {
+        groups = new Map();
+        parsedDatabase.forEach(item => {
+            const key = `${item.code}::${articleBaseNum(item)}`;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(item);
+        });
+        articleGroupsCache.set(parsedDatabase, groups);
+    }
+    return (groups.get(`${article.code}::${articleBaseNum(article)}`) || []).filter(item => item !== article);
+}
+
+// Плашки других частей под описанием в раскрытой строке списка.
+function buildPartsHtml(article) {
+    const siblings = articleSiblings(article);
+    if (siblings.length === 0) return '';
+    const base = articleBaseNum(article);
+    const pills = siblings.map(item => {
+        const part = item.num.slice(base.length).trim() || `ст. ${item.num}`;
+        return `<button type="button" class="row-part" data-part-id="${escapeHtml(articleId(item))}" title="ст. ${escapeHtml(item.num)} — ${escapeHtml(item.title)}"><span class="row-part-num">${escapeHtml(part)}</span><span class="row-part-title">${escapeHtml(item.title)}</span></button>`;
+    }).join('');
+    return `<div class="row-parts"><span class="row-parts-label">Другие части статьи:</span>${pills}</div>`;
+}
+
+// Прокрутка к строке или плитке так, чтобы она не оказалась под закреплённой шапкой.
+function revealInList(el, smooth = false) {
+    el.style.scrollMarginTop = `${document.querySelector('.controls-container').offsetHeight}px`;
+    el.style.scrollMarginBottom = '12px';
+    el.scrollIntoView({ block: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
+}
+
+// Нажатие на плашку части: её строка раскрывается; если строки нет в списке — вставляется под текущей.
+function openArticlePart(fromRow, id, query) {
+    const rows = Array.from(fromRow.parentElement.querySelectorAll('.row'));
+    let target = rows.find(item => item.dataset.articleId === id);
+    if (!target) {
+        const article = parsedDatabase.find(item => articleId(item) === id);
+        if (!article) return;
+        target = buildListRow(article, query, false);
+        target.dataset.inserted = 'true';
+        // Вставленные части идут под исходной строкой в порядке номеров.
+        const order = el => parsedDatabase.findIndex(item => articleId(item) === el.dataset.articleId);
+        let anchor = fromRow;
+        while (anchor.nextElementSibling && anchor.nextElementSibling.dataset.inserted === 'true'
+            && order(anchor.nextElementSibling) < order(target)) {
+            anchor = anchor.nextElementSibling;
+        }
+        anchor.after(target);
+        void target.offsetWidth; // чтобы раскрытие вставленной строки было плавным
+    }
+    target.classList.add('expanded');
+    target.querySelector('.row-header').setAttribute('aria-expanded', 'true');
+    revealInList(target, true);
+}
+
 // ===== Отрисовка: список =====
 
 // Фильтрация/поиск/сортировка уже выполнены в renderArticles(). Строка кликабельна —
 // раскрывает/скрывает полное описание.
 function renderAsList(container, matchedArticles, query, expandedIds) {
-    matchedArticles.forEach(item => {
-        const article = item.article;
+    matchedArticles.forEach(({ article }) => {
+        container.appendChild(buildListRow(article, query, expandedIds.has(articleId(article))));
+    });
+}
 
-        const row = document.createElement('div');
-        const isExpanded = expandedIds.has(articleId(article));
-        row.className = `row ${article.code} ${isPinned(article) ? 'pinned' : ''} ${isExpanded ? 'expanded' : ''}`;
-        row.dataset.articleId = articleId(article);
+function buildListRow(article, query, isExpanded) {
+    const row = document.createElement('div');
+    row.className = `row ${article.code} ${isPinned(article) ? 'pinned' : ''} ${isExpanded ? 'expanded' : ''}`;
+    row.dataset.articleId = articleId(article);
 
-        const { title: highlightedTitle, num: highlightedNum, desc: highlightedDesc } =
-            buildHighlightedFields(article, query);
+    const { title: highlightedTitle, num: highlightedNum, desc: highlightedDesc } =
+        buildHighlightedFields(article, query);
 
-        const typeHtml = buildTypeBadge(article, 'row-slot-type');
+    const typeHtml = buildTypeBadge(article, 'row-slot-type');
 
-        // row-slot-* — фиксированная ширина, заголовок начинается в одной позиции.
-        const leftHtml = `
-            ${buildCodeBadge(article, query, 'row-slot-code')}
-            ${typeHtml}
-            <div class="badge-num row-num row-slot-num">ст. ${highlightedNum}</div>
-            <div class="row-title" title="${escapeHtml(article.title)}">${buildPinButton(article, 14)}${highlightedTitle}</div>
+    // row-slot-* — фиксированная ширина, заголовок начинается в одной позиции.
+    const leftHtml = `
+        ${buildCodeBadge(article, query, 'row-slot-code')}
+        ${typeHtml}
+        <div class="badge-num row-num row-slot-num">ст. ${highlightedNum}</div>
+        <div class="row-title" title="${escapeHtml(article.title)}">${buildPinButton(article, 14)}${highlightedTitle}</div>
+    `;
+
+    // УК — штраф/звёзды/арест, доп. мера — только если заполнена.
+    // АК и ДК — доп. мера/штраф, звёзды и арест — только если заполнены. row-slot-* держат ширину.
+    let rightHtml = '';
+    if (article.code === 'uk') {
+        const safeFine = escapeHtml(article.fine);
+        const safeArrest = escapeHtml(article.arrest);
+        const hasFelony = hasFelonyRecord(article);
+        const arrestTitle = safeArrest
+            ? `${safeArrest}, ${hasFelony ? 'судимость' : 'без судимости'}`
+            : 'Арест';
+        // Доп. мера у статьи УК: плашка слева от штрафа, остальные колонки не сдвигаются.
+        const safeExtraMeasure = escapeHtml(article.extraMeasure);
+        const extraHtml = safeExtraMeasure
+            ? `<div class="row-tag row-slot-extra" title="${safeExtraMeasure}">${safeExtraMeasure}</div>`
+            : '';
+
+        rightHtml = `
+            ${extraHtml}
+            <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="${safeFine ? `Штраф: ${safeFine}` : 'Штраф'}">${safeFine || '—'}</div>
+            ${buildStarsTag(article)}
+            <div class="row-tag row-slot-arrest ${hasFelony ? 'row-danger' : ''}" title="${arrestTitle}">${safeArrest || '—'}</div>
         `;
-
-        // УК — штраф/звёзды/арест, доп. мера — только если заполнена.
-        // АК и ДК — доп. мера/штраф, звёзды и арест — только если заполнены. row-slot-* держат ширину.
-        let rightHtml = '';
-        if (article.code === 'uk') {
-            const safeFine = escapeHtml(article.fine);
-            const safeArrest = escapeHtml(article.arrest);
-            const hasFelony = hasFelonyRecord(article);
-            const arrestTitle = safeArrest
-                ? `${safeArrest}, ${hasFelony ? 'судимость' : 'без судимости'}`
-                : 'Арест';
-            // Доп. мера у статьи УК: плашка слева от штрафа, остальные колонки не сдвигаются.
-            const safeExtraMeasure = escapeHtml(article.extraMeasure);
-            const extraHtml = safeExtraMeasure
-                ? `<div class="row-tag row-slot-extra" title="${safeExtraMeasure}">${safeExtraMeasure}</div>`
-                : '';
-
-            rightHtml = `
-                ${extraHtml}
-                <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="${safeFine ? `Штраф: ${safeFine}` : 'Штраф'}">${safeFine || '—'}</div>
-                ${buildStarsTag(article)}
-                <div class="row-tag row-slot-arrest ${hasFelony ? 'row-danger' : ''}" title="${arrestTitle}">${safeArrest || '—'}</div>
-            `;
-        } else {
-            const safeExtraMeasure = escapeHtml(article.extraMeasure);
-            const safeFine = escapeHtml(article.fine);
-            const hasExtraMeasure = Boolean(article.extraMeasure);
-            let extraHtml = `<div class="row-tag row-slot-extra ${hasExtraMeasure ? '' : 'row-hidden'}" title="${hasExtraMeasure ? safeExtraMeasure : ''}">${safeExtraMeasure}</div>`;
-            // Звёзды и арест у статьи АК или ДК: плашки встают на место пустой доп. меры, вплотную к штрафу.
-            const safeArrest = escapeHtml(article.arrest);
-            const penaltyHtml = (article.stars ? buildStarsTag(article) : '')
-                + (safeArrest ? `<div class="row-tag row-slot-arrest" title="Арест: ${safeArrest}">${safeArrest}</div>` : '');
-            if (penaltyHtml) {
-                extraHtml = hasExtraMeasure
-                    ? penaltyHtml + extraHtml
-                    : `<div class="row-slot-holder">${penaltyHtml}</div>`;
-            }
-
-            rightHtml = `
-                ${extraHtml}
-                <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="${safeFine ? `Штраф: ${safeFine}` : 'Штраф'}">${safeFine || '—'}</div>
-            `;
+    } else {
+        const safeExtraMeasure = escapeHtml(article.extraMeasure);
+        const safeFine = escapeHtml(article.fine);
+        const hasExtraMeasure = Boolean(article.extraMeasure);
+        let extraHtml = `<div class="row-tag row-slot-extra ${hasExtraMeasure ? '' : 'row-hidden'}" title="${hasExtraMeasure ? safeExtraMeasure : ''}">${safeExtraMeasure}</div>`;
+        // Звёзды и арест у статьи АК или ДК: плашки встают на место пустой доп. меры, вплотную к штрафу.
+        const safeArrest = escapeHtml(article.arrest);
+        const penaltyHtml = (article.stars ? buildStarsTag(article) : '')
+            + (safeArrest ? `<div class="row-tag row-slot-arrest" title="Арест: ${safeArrest}">${safeArrest}</div>` : '');
+        if (penaltyHtml) {
+            extraHtml = hasExtraMeasure
+                ? penaltyHtml + extraHtml
+                : `<div class="row-slot-holder">${penaltyHtml}</div>`;
         }
 
-        row.innerHTML = `
-            <div class="row-header" role="button" tabindex="0" aria-expanded="${isExpanded}">
-                <div class="row-left">${leftHtml}</div>
-                <div class="row-right">${rightHtml}</div>
-                <svg class="row-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-            </div>
-            <div class="row-desc-wrapper">
-                <div class="row-desc-inner">
-                    <div class="row-desc">${highlightedDesc}</div>
-                </div>
-            </div>
+        rightHtml = `
+            ${extraHtml}
+            <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="${safeFine ? `Штраф: ${safeFine}` : 'Штраф'}">${safeFine || '—'}</div>
         `;
+    }
 
-        attachArticleHandlers(row, article, { stopPropagation: true });
+    const partsHtml = buildPartsHtml(article);
 
-        const header = row.querySelector('.row-header');
-        const toggleExpanded = () => {
-            const willExpand = !row.classList.contains('expanded');
-            row.classList.toggle('expanded', willExpand);
-            header.setAttribute('aria-expanded', String(willExpand));
-        };
-        header.addEventListener('click', toggleExpanded);
-        header.addEventListener('keydown', (e) => {
-            if (e.target.closest('.pin-btn')) return;
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                toggleExpanded();
-            }
-        });
+    row.innerHTML = `
+        <div class="row-header" role="button" tabindex="0" aria-expanded="${isExpanded}">
+            <div class="row-left">${leftHtml}</div>
+            <div class="row-right">${rightHtml}</div>
+            <svg class="row-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="row-desc-wrapper">
+            <div class="row-desc-inner">
+                <div class="row-desc ${partsHtml ? 'row-desc-with-parts' : ''}">${highlightedDesc}</div>
+                ${partsHtml}
+            </div>
+        </div>
+    `;
 
-        container.appendChild(row);
+    attachArticleHandlers(row, article, { stopPropagation: true });
+
+    row.querySelectorAll('.row-part').forEach(btn => btn.addEventListener('click', () => {
+        openArticlePart(row, btn.dataset.partId, query);
+    }));
+
+    const header = row.querySelector('.row-header');
+    const toggleExpanded = () => {
+        const willExpand = !row.classList.contains('expanded');
+        row.classList.toggle('expanded', willExpand);
+        header.setAttribute('aria-expanded', String(willExpand));
+    };
+    header.addEventListener('click', toggleExpanded);
+    header.addEventListener('keydown', (e) => {
+        if (e.target.closest('.pin-btn')) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleExpanded();
+        }
     });
+
+    return row;
 }
 
 // ===== Общая информация: диспетчер шаблонов =====
@@ -1366,6 +1681,10 @@ document.addEventListener('keydown', (e) => {
         closeSettingsPanel();
     } else if (searchField.value !== '') {
         clearSearch();
+    } else {
+        // Поиск пуст: Esc снимает выбор статьи и возвращает курсор в поле поиска.
+        selectByKeyboard(null);
+        searchField.focus({ preventScroll: true });
     }
 });
 
@@ -1422,6 +1741,187 @@ searchField.addEventListener('input', () => {
 });
 
 if (searchClearBtn) searchClearBtn.addEventListener('click', clearSearch);
+
+// ===== Управление с клавиатуры: стрелки выбирают статью, Ctrl+C копирует её номер =====
+
+function articleElements() {
+    return Array.from(document.querySelectorAll('#articlesContainer [data-article-id]'));
+}
+
+function selectByKeyboard(el) {
+    document.querySelectorAll('#articlesContainer .kbd-selected').forEach(other => other.classList.remove('kbd-selected'));
+    keyboardSelectedId = el ? el.dataset.articleId : null;
+    if (!el) return;
+    el.classList.add('kbd-selected');
+    revealInList(el);
+}
+
+// После перерисовки без смены выдачи (например, закрепление) выбор остаётся на той же статье.
+function restoreKeyboardSelection() {
+    if (!keyboardSelectedId) return;
+    const el = articleElements().find(item => item.dataset.articleId === keyboardSelectedId);
+    if (el) el.classList.add('kbd-selected');
+    else keyboardSelectedId = null;
+}
+
+// Переход по кнопкам строки «Найдено» стрелками влево и вправо; после перехода выбрана первая статья выдачи.
+// Возвращает false, если строки «Найдено» нет.
+function shiftFoundCategory(step) {
+    // Набранный запрос применяется сразу, без ожидания паузы после ввода.
+    clearTimeout(searchDebounceTimer);
+    if (searchField.value !== renderedSearchText) renderArticles();
+
+    const chips = Array.from(document.querySelectorAll('#articlesContainer .found-chip'));
+    if (chips.length === 0) return false;
+    const next = chips[chips.findIndex(chip => chip.classList.contains('active')) + step];
+    if (next) {
+        searchCodeFilter = next.dataset.code || null;
+        renderArticles();
+        selectByKeyboard(articleElements()[0] || null);
+        scrollToListTop();
+    }
+    return true;
+}
+
+// Переход на соседнюю вкладку стрелками влево и вправо, когда поиска нет.
+function shiftTab(step) {
+    const tabs = Array.from(document.querySelectorAll('.tab-btn'));
+    const next = tabs[tabs.findIndex(tab => tab.classList.contains('active')) + step];
+    if (next) next.click();
+}
+
+// В плитках стрелки вверх и вниз переходят в соседний ряд, на плитку в той же колонке.
+function gridNeighbor(items, current, step) {
+    const from = current.getBoundingClientRect();
+    const boxes = items.map(el => ({ el, box: el.getBoundingClientRect() }))
+        .filter(({ box }) => (step > 0 ? box.top > from.top + 1 : box.top < from.top - 1));
+    if (boxes.length === 0) return null;
+    const tops = boxes.map(({ box }) => box.top);
+    const rowTop = step > 0 ? Math.min(...tops) : Math.max(...tops);
+    return boxes.filter(({ box }) => Math.abs(box.top - rowTop) < 2)
+        .reduce((best, item) => (Math.abs(item.box.left - from.left) < Math.abs(best.box.left - from.left) ? item : best)).el;
+}
+
+// Раскрывает или сворачивает описание статьи, выбранной стрелками (в плитках оно видно всегда).
+function toggleSelectedDescription() {
+    const el = articleElements().find(item => item.dataset.articleId === keyboardSelectedId);
+    if (!el) return;
+    closeSettingsPanel();
+    el.querySelector('.row-header').click();
+    setTimeout(() => revealInList(el, true), 280);
+}
+
+searchField.title = '↑ ↓ — выбрать статью, Ctrl+C — скопировать номер, пробел — описание, ← → — кодекс';
+zoomMinusBtn.title = 'Уменьшить (←)';
+zoomPlusBtn.title = 'Увеличить (→)';
+
+// Щелчок по полю поиска снимает выбор статьи: стрелки влево и вправо снова двигают курсор по тексту.
+searchField.addEventListener('mousedown', () => selectByKeyboard(null));
+
+// Ctrl+C копирует номер статьи, выбранной стрелками. Если выделен текст — в поле поиска или на странице —
+// копируется он, как обычно. Клавиша определяется по положению (KeyC), раскладка не важна.
+document.addEventListener('keydown', (e) => {
+    if (e.code !== 'KeyC' || !e.ctrlKey || e.altKey || e.shiftKey || !keyboardSelectedId) return;
+    if (document.activeElement === searchField && searchField.selectionStart !== searchField.selectionEnd) return;
+    if (String(window.getSelection()) !== '') return;
+    const article = parsedDatabase.find(item => articleId(item) === keyboardSelectedId);
+    if (!article) return;
+    e.preventDefault();
+    closeSettingsPanel();
+    copyArticleNumber(article);
+});
+
+// Печать где угодно попадает в поиск: курсор переходит в поле, и набранный знак вводится уже в него.
+document.addEventListener('keydown', (e) => {
+    if (e.key.length !== 1 || e.key === ' ' || e.ctrlKey || e.altKey || e.metaKey) return;
+    if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]')) return;
+    closeSettingsPanel();
+    searchField.focus({ preventScroll: true });
+    searchField.setSelectionRange(searchField.value.length, searchField.value.length);
+});
+
+// Клавиши слушаются на всей странице: стрелки работают и после нажатия на вкладку, настройки или строку списка.
+document.addEventListener('keydown', (e) => {
+    if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) return;
+    if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+
+    const inSearch = e.target === searchField;
+    if (!inSearch && e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]')) return;
+
+    // Фокус уходит с кнопки или строки, чтобы следующий пробел раскрыл описание, а не нажал её.
+    const releaseFocus = () => {
+        if (!inSearch && document.activeElement !== document.body) document.activeElement.blur();
+    };
+
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        const step = e.key === 'ArrowRight' ? 1 : -1;
+        // В открытых настройках стрелки влево и вправо меняют масштаб.
+        if (settingsPanel.classList.contains('open')) {
+            e.preventDefault();
+            setZoom(currentZoom + step * ZOOM_STEP);
+            return;
+        }
+
+        // В поле поиска эти стрелки двигают курсор по тексту. Списку они достаются, когда статья уже выбрана
+        // стрелками или когда курсору некуда двигаться в эту сторону (поле пустое, курсор на краю текста).
+        const caretAtEdge = step === 1
+            ? searchField.selectionStart === searchField.value.length
+            : searchField.selectionEnd === 0;
+        if (inSearch && !keyboardSelectedId && !caretAtEdge) return;
+
+        // В плитках стрелки влево и вправо переходят на соседнюю плитку.
+        if (currentView === 'grid' && currentCode !== 'pk') {
+            const items = articleElements();
+            const at = items.findIndex(item => item.dataset.articleId === keyboardSelectedId);
+            if (items.length === 0 || (at === -1 && (step === -1 || e.repeat))) return;
+            e.preventDefault();
+            releaseFocus();
+            selectByKeyboard(items[Math.min(Math.max(at + step, 0), items.length - 1)]);
+            return;
+        }
+
+        // В списке: без поиска — соседняя вкладка, при поиске — соседний кодекс в строке «Найдено».
+        // Удержание клавиши не считается, чтобы не проскочить несколько вкладок подряд.
+        if (e.repeat) return;
+        if (searchField.value === '') {
+            e.preventDefault();
+            releaseFocus();
+            shiftTab(step);
+        } else if (currentCode !== 'pk' && shiftFoundCategory(step)) {
+            e.preventDefault();
+            releaseFocus();
+        }
+        return;
+    }
+
+    if (currentCode === 'pk') return;
+
+    // Пробел раскрывает описание, когда статья выбрана стрелками в списке; иначе это обычный пробел в запросе.
+    if (e.key === ' ') {
+        if (!keyboardSelectedId || currentView !== 'list' || (!inSearch && e.target !== document.body)) return;
+        e.preventDefault();
+        if (!e.repeat) toggleSelectedDescription();
+        return;
+    }
+
+    const items = articleElements();
+    if (items.length === 0) return;
+    e.preventDefault();
+    // Открытые настройки закрываются: стрелки относятся к списку статей.
+    closeSettingsPanel();
+    releaseFocus();
+
+    const step = e.key === 'ArrowDown' ? 1 : -1;
+    const current = items.find(item => item.dataset.articleId === keyboardSelectedId);
+    let next;
+    if (!current) next = step === 1 ? items[0] : null;
+    else if (currentView === 'grid') next = gridNeighbor(items, current, step);
+    else next = items[items.indexOf(current) + step];
+    // Вниз с последней статьи — выбор остаётся; вверх с первой — выбор снимается.
+    if (!next && step === 1) next = current || null;
+    selectByKeyboard(next || null);
+    if (!next) scrollToListTop();
+});
 
 syncSearchClearBtn();
 searchField.focus();

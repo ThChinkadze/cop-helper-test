@@ -364,6 +364,53 @@ body {
     color: var(--text-title);
 }
 
+/* Список клавиш внизу панели настроек: действие слева, клавиши справа */
+.settings-keys {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.settings-keys-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.settings-key-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-bright);
+}
+
+.settings-key-caps {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.settings-key-caps kbd {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    box-sizing: border-box;
+    padding: 0 7px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text-bright);
+    background-color: var(--control-bg);
+    border: 1px solid var(--control-border);
+    border-radius: 5px;
+}
+
 #articlesContainer { 
     display: grid; 
     grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr)); 
@@ -1131,3 +1178,177 @@ body {
 @media (max-width: 640px) {
     body { padding: 12px; }
 }
+
+/* Статья, выбранная стрелками с клавиатуры */
+.row.kbd-selected,
+.card.kbd-selected {
+    outline: 2px solid var(--accent);
+    background-color: #232a30;
+}
+
+/* Другие части статьи — плашки под описанием в раскрытой строке */
+.row-desc.row-desc-with-parts {
+    padding-bottom: 10px;
+}
+
+.row-parts {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px 14px;
+    font-size: 13px;
+}
+
+.row-parts-label {
+    flex-shrink: 0;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+/* Плашки стоят в одну строку: если не помещаются, длинные названия обрезаются многоточием,
+   а короткие остаются целыми (место делится поровну, но не больше, чем нужно плашке) */
+.row-part {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: max-content;
+    padding: 4px 10px 4px 4px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main);
+    text-align: left;
+    background-color: var(--control-bg);
+    border: 1px solid var(--control-border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.row-part:hover,
+.row-part:focus-visible {
+    border-color: var(--accent);
+    color: var(--text-title);
+    outline: none;
+}
+
+.row-part-num {
+    flex-shrink: 0;
+    padding: 1px 7px;
+    font-weight: 700;
+    color: var(--text-bright);
+    background-color: var(--card-bg);
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.row-part-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* В свёрнутой строке плашки недоступны с клавиатуры; скрываются после того, как строка свернулась */
+.row:not(.expanded) .row-parts {
+    visibility: hidden;
+    transition: visibility 0s linear 0.25s;
+}
+
+/* Строка «Недавно скопированные» над списком статей */
+.recent-row {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 0 2px 6px;
+    font-size: 13px;
+}
+
+.recent-label {
+    margin-right: 2px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.recent-chip {
+    font-family: 'Nunito', sans-serif;
+}
+
+/* Строка «Найдено» над выдачей поиска: счётчики по кодексам и отбор по кодексу */
+.found-row {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 0 2px 6px;
+    font-size: 13px;
+}
+
+.found-label {
+    margin-right: 2px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.found-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 28px;
+    box-sizing: border-box;
+    padding: 0 12px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 18px;
+    color: var(--text-bright);
+    background-color: var(--control-bg);
+    border: 1px solid var(--control-border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.found-chip:hover,
+.found-chip:focus-visible {
+    border-color: var(--accent);
+    outline: none;
+}
+
+.found-chip.active {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: var(--text-title);
+    cursor: default;
+}
+
+/* Кодекс внутри кнопки — отдельной плашкой своего цвета, как в строках статей */
+.found-chip[data-code]:not([data-code=""]) {
+    padding-left: 4px;
+}
+
+/* Размеры заданы целыми пикселями и одинаковы у всех кодексов: плашки стоят на одной линии,
+   текст — по центру плашки */
+.found-code {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 20px;
+    box-sizing: border-box;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    background-color: var(--card-bg);
+    border: 1px solid var(--control-border);
+    border-radius: 4px;
+}
+
+.found-code.uk { color: var(--uk-color); border-color: var(--uk-color); }
+.found-code.ak { color: var(--ak-color); border-color: var(--ak-color); }
+.found-code.dk { color: var(--dk-color); border-color: var(--dk-color); }
