@@ -1531,17 +1531,14 @@ body:not(.keys-on) .search-kbd {
         grid-column: 2 / span 2;
     }
 
+    /* Номер и тип — одной ширины во всех карточках: сетка не зависит от длины номера */
     .row-main .num {
-        width: auto;
+        width: 140px;
         height: 44px;
-        padding: 0 12px;
         font-size: 13.5px;
     }
 
-    .row-main .cell-type {
-        width: auto;
-        padding: 0 12px;
-    }
+    .row-main .cell-type { width: 56px; }
 
     .row-main .cell-title {
         flex: 1 1 100%;
@@ -1571,7 +1568,8 @@ body:not(.keys-on) .search-kbd {
         font-size: 12.5px;
     }
 
-    .row-pen .money { flex: 1.35 1 0; }
+    /* Ячейка штрафа шире остальных и тогда, когда в ней прочерк: линии в соседних карточках совпадают */
+    .row-pen .fine { flex: 1.35 1 0; }
 
     /* Доп. мера — отдельной строкой над остальными наказаниями */
     .row-pen .extra {
@@ -1635,12 +1633,8 @@ body:not(.keys-on) .search-kbd {
 /* В настройках остаются только «Статьи»: масштаб и подсказки клавиш здесь не действуют */
 .touch .no-touch { display: none; }
 
-/* Значок копирования виден всегда и стоит рядом с номером */
-.touch .num .ico {
-    position: static;
-    transform: none;
-    opacity: .65;
-}
+/* Значок копирования виден всегда */
+.touch .num .ico { opacity: .65; }
 
 /* Область нажатия на булавку больше самой булавки: в мелкую пальцем не попасть */
 .touch .pin { position: relative; }

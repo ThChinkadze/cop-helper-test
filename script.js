@@ -1384,8 +1384,8 @@ function buildListRow(article, query, isExpanded) {
         extraUk: extraHtml,
         extra: extraHtml,
         fine: safeFine
-            ? `<div class="cell money" title="Штраф: ${safeFine}"><span>${wrapBeforeWord(article.fine, 'до')}</span></div>`
-            : '<div class="cell empty" title="Штраф">—</div>',
+            ? `<div class="cell fine money" title="Штраф: ${safeFine}"><span>${wrapBeforeWord(article.fine, 'до')}</span></div>`
+            : '<div class="cell fine empty" title="Штраф">—</div>',
         stars: `<div class="cell" title="${starsTitle(article)}">${buildStarsHtml(article) || '<span class="empty">—</span>'}</div>`,
         term: safeArrest
             ? `<div class="cell term ${hasFelony ? 'felony' : ''}" title="${arrestTitle}"><span>${wrapBeforeWord(article.arrest, 'или')}</span>${hasFelony ? '<span class="fel-cap">судимость</span>' : ''}</div>`
