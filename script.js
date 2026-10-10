@@ -1886,19 +1886,23 @@ function disarmHover() {
     syncPointingState(null);
 }
 
-document.addEventListener('mousemove', (e) => {
+function trackMouse(e) {
     if (touchQuery.matches) return;
+    const pressed = e.type === 'mousedown';
     // Страница сдвинулась под неподвижным курсором — это не движение мыши.
-    if (e.clientX === lastMouseX && e.clientY === lastMouseY) return;
+    if (!pressed && e.clientX === lastMouseX && e.clientY === lastMouseY) return;
     lastMouseX = e.clientX;
     lastMouseY = e.clientY;
-    // Мышь задели во время набора запроса — клавиатура остаётся главной.
-    if (!hoverArmed && Date.now() - lastTypedAt < HOVER_AFTER_KEY_MS) return;
+    // Мышь задели во время набора запроса — клавиатура остаётся главной. Нажатие кнопки мыши случайным не считается.
+    if (!pressed && !hoverArmed && Date.now() - lastTypedAt < HOVER_AFTER_KEY_MS) return;
     hoverArmed = true;
     hoverTargetId = articleIdAt(e.target);
     hoverScrollY = window.scrollY;
     syncPointingState(e.target);
-});
+}
+
+document.addEventListener('mousemove', trackMouse);
+document.addEventListener('mousedown', trackMouse);
 
 document.addEventListener('wheel', (e) => {
     if (touchQuery.matches || (!hoverArmed && Date.now() - lastTypedAt < HOVER_AFTER_KEY_MS)) return;
@@ -1968,9 +1972,22 @@ document.addEventListener('keydown', (e) => {
     copyArticleNumber(article, { cell: el.querySelector('.num') });
 });
 
+// Щелчок мышью не оставляет фокус на кнопке или строке: иначе следующий пробел или Enter нажал бы её ещё раз,
+// а первая же клавиша нарисовала бы вокруг неё рамку фокуса. Переход клавишей Tab работает как обычно:
+// у нажатия с клавиатуры detail равен нулю.
+document.addEventListener('click', (e) => {
+    if (e.detail === 0) return;
+    const active = document.activeElement;
+    if (!active || active === document.body || active.closest('input, textarea, select, [contenteditable]')) return;
+    active.blur();
+});
+
 // Печать где угодно попадает в поиск: курсор переходит в поле, и набранный знак вводится уже в него.
+// Так же работает Backspace, пока в запросе есть что стирать.
 document.addEventListener('keydown', (e) => {
-    if (e.key.length !== 1 || e.key === ' ' || e.ctrlKey || e.altKey || e.metaKey) return;
+    const typing = e.key.length === 1 && e.key !== ' ';
+    const erasing = e.key === 'Backspace' && searchField.value !== '';
+    if ((!typing && !erasing) || e.ctrlKey || e.altKey || e.metaKey) return;
     if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]')) return;
     closeSettingsPanel();
     searchField.focus({ preventScroll: true });
@@ -2019,6 +2036,19 @@ document.addEventListener('keydown', (e) => {
             e.preventDefault();
             releaseFocus();
         }
+        return;
+    }
+
+    // Пробел вне поля поиска, когда раскрывать нечего: продолжает запрос, а при пустом запросе ничего не делает.
+    // Без этого браузер прокручивал бы страницу на целый экран.
+    if (e.key === ' ' && e.target === document.body && (currentCode === 'pk' || !keyboardSelectedId)) {
+        if (searchField.value === '') {
+            e.preventDefault();
+            return;
+        }
+        closeSettingsPanel();
+        searchField.focus({ preventScroll: true });
+        searchField.setSelectionRange(searchField.value.length, searchField.value.length);
         return;
     }
 

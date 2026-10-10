@@ -537,12 +537,16 @@ svg {
     contain-intrinsic-size: auto 48px;
 }
 
+/* Строка — кнопка: текст в ней мышью не выделяется. Иначе двойной щелчок или дрогнувшая при нажатии мышь
+   оставляют выделение, и Ctrl+C копирует его вместо номера статьи. Описание под строкой выделяется как обычно */
 .grid {
     display: grid;
     grid-template-columns: var(--cols);
     align-items: stretch;
     min-height: 46px;
     cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .grid:focus-visible { outline-offset: -2px; }
