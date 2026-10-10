@@ -18,7 +18,6 @@
     --fill-line: #3481dc;
     --on-fill: #ffffff;
     --tint: rgba(52, 129, 220, .16);
-    --term: #ef9095;
     --danger: #ff4d57;
     --uk: #ff4b45;
     --ak: #ff7f2a;
@@ -690,21 +689,20 @@ svg {
 
 .money { color: var(--money); }
 
-/* Срок без судимости: светлый оттенок красного — то же семейство, что срок с судимостью, но спокойнее */
-.term { color: var(--term); }
+/* Срок ареста — всегда одного красного цвета; судимость отличает подпись под сроком */
+.term { color: var(--danger); }
 
 .felony {
     flex-direction: column;
     gap: 0;
-    color: var(--danger);
 }
 
 /* Подпись под сроком у статей с судимостью */
 .fel-cap {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
     letter-spacing: .02em;
-    line-height: 1.2;
+    line-height: 1.1;
     opacity: .72;
 }
 
