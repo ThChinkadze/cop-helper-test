@@ -417,7 +417,7 @@ svg {
 
 .found .keys { margin-left: 14px; }
 
-/* Короткая подпись «Недавние» — для телефона */
+/* Короткая подпись «Недавние» — для узкой страницы */
 .r-short { display: none; }
 
 .chips {
@@ -461,6 +461,29 @@ svg {
         background: var(--fill);
         border-color: var(--fill-line);
         color: var(--on-fill);
+    }
+}
+
+/* Кнопка очистки строки «Недавно скопированные»: стоит после номеров, приглушена */
+.recent-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    margin-left: 8px;
+    padding: 0;
+    flex-shrink: 0;
+    background: var(--s1);
+    border: 1px solid var(--l2);
+    color: var(--text3);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .recent-clear:hover {
+        color: var(--text);
+        border-color: var(--l3);
+        background: var(--s2);
     }
 }
 
@@ -1313,6 +1336,7 @@ body:not(.keys-on) .search-kbd {
 .search,
 .search-side,
 .info-card,
+.recent-clear,
 .zoom button {
     transition: background-color .12s, border-color .12s, color .12s, box-shadow .12s;
 }
@@ -1424,6 +1448,15 @@ body:not(.keys-on) .search-kbd {
         max-width: 100%;
     }
 
+    /* «Найдено» и «Недавно скопированные» прокручиваются вбок, если номера не помещаются в строку */
+    .chips {
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .chips::-webkit-scrollbar { display: none; }
+    .chip:focus-visible { outline-offset: -2px; }
+
     .info { grid-auto-rows: 380px; }
 }
 
@@ -1445,8 +1478,15 @@ body:not(.keys-on) .search-kbd {
 }
 
 @container app (max-width: 999px) {
-    .t-full { display: none; }
-    .t-short { display: inline; }
+    .t-full,
+    .r-full {
+        display: none;
+    }
+
+    .t-short,
+    .r-short {
+        display: inline;
+    }
 }
 
 /* В одну колонку карточкам незачем быть одной высоты: каждая — по своему содержимому, без прокрутки внутри */
@@ -1504,17 +1544,15 @@ body:not(.keys-on) .search-kbd {
 
     .found .label { display: none; }
     .recent .label { margin-right: 10px; }
-    .r-full { display: none; }
-    .r-short { display: inline; }
-
-    /* «Найдено» и «Недавно скопированные» прокручиваются вбок */
-    .chips {
-        overflow-x: auto;
-        scrollbar-width: none;
-    }
-
-    .chips::-webkit-scrollbar { display: none; }
     .chip { height: 34px; }
+
+    /* Кнопка очистки закреплена у правого края и не уезжает вместе с номерами */
+    .recent .chips { flex: 1; }
+
+    .recent-clear {
+        width: 34px;
+        height: 34px;
+    }
 
     .stale {
         flex-wrap: wrap;

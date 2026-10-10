@@ -114,6 +114,23 @@ function renderRecentRow() {
         chips.appendChild(chip);
     });
     row.appendChild(chips);
+
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'recent-clear';
+    clear.title = 'Очистить недавние';
+    clear.setAttribute('aria-label', 'Очистить недавние');
+    clear.innerHTML = icon('i-x', 14);
+    clear.addEventListener('click', clearRecentCopied);
+    row.appendChild(clear);
+}
+
+// Кнопка с крестиком в конце строки: список недавних очищается целиком.
+function clearRecentCopied() {
+    recentCopied = [];
+    localStorage.removeItem(RECENT_KEY);
+    renderRecentRow();
+    showToast('Недавние очищены');
 }
 
 function isPinned(article) {
