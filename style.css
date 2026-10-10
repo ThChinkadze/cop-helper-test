@@ -1304,10 +1304,13 @@ svg {
 
 .keybar .quiet { color: var(--text3); }
 
-.keybar .when-sel { display: none; }
-.is-selected .keybar .when-sel { display: flex; }
-.is-selected .keybar .when-none { display: none; }
-.on-info .keybar .no-info { display: none; }
+/* Три набора подсказок: обычный (s-none), статья выбрана стрелками (s-sel), курсор мыши над списком (s-point) */
+body:not(.is-selected):not(.is-pointing) .keybar .item:not(.s-none),
+.is-selected .keybar .item:not(.s-sel),
+.is-pointing:not(.is-selected) .keybar .item:not(.s-point),
+.on-info .keybar .no-info {
+    display: none;
+}
 
 /* С полосой страница, уведомление и кнопка «наверх» стоят выше */
 .keys-on .app { padding-bottom: 70px; }

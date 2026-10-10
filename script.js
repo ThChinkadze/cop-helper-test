@@ -1856,20 +1856,116 @@ searchField.addEventListener('mousedown', () => {
     selectByKeyboard(null);
 });
 
-// Ctrl+C копирует номер статьи, выбранной стрелками. Если выделен текст — в поле поиска или на странице —
-// копируется он, как обычно. Клавиша определяется по положению (KeyC), раскладка не важна.
+// ===== Статья под курсором мыши =====
+// Ctrl+C и пробел действуют и на статью, на которую наведена мышь, — выбирать её стрелками не нужно.
+// Наведение учитывается, только пока мышью пользовались позже, чем клавиатурой: во время набора запроса
+// пробел остаётся пробелом, а после стрелок клавиши относятся к выбранной ими статье.
+const HOVER_AFTER_KEY_MS = 400;
+let hoverArmed = false;
+let hoverTargetId = null;
+// Положение прокрутки, при котором найдена статья под курсором. Если страница с тех пор прокручена,
+// под курсором уже другая статья — какая, выясняется при нажатии клавиши.
+let hoverScrollY = 0;
+let lastMouseX = -1;
+let lastMouseY = -1;
+let lastTypedAt = 0;
+
+function articleIdAt(node) {
+    const el = node instanceof Element ? node.closest('#articlesContainer [data-article-id]') : null;
+    return el ? el.dataset.articleId : null;
+}
+
+// Пока курсор над списком статей, полоса подсказок показывает клавиши для статьи под курсором.
+function syncPointingState(node) {
+    const overList = node instanceof Element && Boolean(node.closest('#articlesContainer.list'));
+    document.body.classList.toggle('is-pointing', hoverArmed && overList);
+}
+
+function disarmHover() {
+    hoverArmed = false;
+    syncPointingState(null);
+}
+
+document.addEventListener('mousemove', (e) => {
+    if (touchQuery.matches) return;
+    // Страница сдвинулась под неподвижным курсором — это не движение мыши.
+    if (e.clientX === lastMouseX && e.clientY === lastMouseY) return;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+    // Мышь задели во время набора запроса — клавиатура остаётся главной.
+    if (!hoverArmed && Date.now() - lastTypedAt < HOVER_AFTER_KEY_MS) return;
+    hoverArmed = true;
+    hoverTargetId = articleIdAt(e.target);
+    hoverScrollY = window.scrollY;
+    syncPointingState(e.target);
+});
+
+document.addEventListener('wheel', (e) => {
+    if (touchQuery.matches || (!hoverArmed && Date.now() - lastTypedAt < HOVER_AFTER_KEY_MS)) return;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+    hoverArmed = true;
+    hoverScrollY = NaN;
+    syncPointingState(e.target);
+}, { passive: true });
+
+document.documentElement.addEventListener('mouseleave', () => {
+    lastMouseX = -1;
+    lastMouseY = -1;
+    hoverTargetId = null;
+    hoverScrollY = window.scrollY;
+    syncPointingState(null);
+});
+
+// Строка статьи под курсором — если мышью пользовались последней.
+function hoveredArticleEl() {
+    if (!hoverArmed) return null;
+    if (window.scrollY !== hoverScrollY) {
+        hoverTargetId = lastMouseX < 0 ? null : articleIdAt(document.elementFromPoint(lastMouseX, lastMouseY));
+        hoverScrollY = window.scrollY;
+    }
+    if (!hoverTargetId) return null;
+    return articleElements().find(item => item.dataset.articleId === hoverTargetId) || null;
+}
+
+// Срабатывает раньше остальных обработчиков клавиш. Пробел по статье под курсором раскрывает её описание,
+// как щелчок по строке: он не попадает в запрос и не нажимает кнопку, на которой стоит фокус.
+// Любая другая клавиша, кроме Ctrl+C, возвращает управление клавиатуре.
+document.addEventListener('keydown', (e) => {
+    if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
+
+    if (e.key === ' ' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
+        const el = currentCode === 'pk' ? null : hoveredArticleEl();
+        if (el) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.repeat) return;
+            closeSettingsPanel();
+            el.querySelector('.grid').click();
+            return;
+        }
+    }
+
+    if (e.code === 'KeyC' && e.ctrlKey && !e.altKey && !e.shiftKey) return;
+    lastTypedAt = Date.now();
+    disarmHover();
+}, true);
+
+// Ctrl+C копирует номер статьи под курсором мыши, а если мышью не пользовались — выбранной стрелками.
+// Если выделен текст — в поле поиска или на странице — копируется он, как обычно.
+// Клавиша определяется по положению (KeyC), раскладка не важна.
 document.addEventListener('keydown', (e) => {
     if (e.code !== 'KeyC' || !e.ctrlKey || e.altKey || e.shiftKey) return;
     applyPendingSearch();
-    if (!keyboardSelectedId) return;
+    const el = hoveredArticleEl() || articleElements().find(item => item.dataset.articleId === keyboardSelectedId);
+    if (!el) return;
     if (document.activeElement === searchField && searchField.selectionStart !== searchField.selectionEnd) return;
     if (String(window.getSelection()) !== '') return;
-    const article = parsedDatabase.find(item => articleId(item) === keyboardSelectedId);
+    const article = parsedDatabase.find(item => articleId(item) === el.dataset.articleId);
     if (!article) return;
     e.preventDefault();
     closeSettingsPanel();
-    const selected = articleElements().find(item => item.dataset.articleId === keyboardSelectedId);
-    copyArticleNumber(article, { cell: selected ? selected.querySelector('.num') : null });
+    copyArticleNumber(article, { cell: el.querySelector('.num') });
 });
 
 // Печать где угодно попадает в поиск: курсор переходит в поле, и набранный знак вводится уже в него.
