@@ -30,12 +30,6 @@ let keyboardSelectedId = null;
 let renderedSearchText = '';
 // Показана ли сейчас выдача поиска (а не обычный список статей кодекса).
 let listShowsSearch = false;
-// В плитках: стрелки влево и вправо заняты строкой «Найдено», хотя статья не выбрана.
-let foundRowKeysActive = false;
-
-// ===== Вид отображения (плитки/список) =====
-const VIEW_KEY = STORAGE_PREFIX + 'view_mode';
-let currentView = localStorage.getItem(VIEW_KEY) === 'grid' ? 'grid' : 'list';
 
 // ===== Режим отображения (compact/full) =====
 const DISPLAY_MODE_KEY = STORAGE_PREFIX + 'display_mode';
@@ -49,6 +43,10 @@ const storedZoom = parseInt(localStorage.getItem(ZOOM_KEY), 10);
 let currentZoom = (Number.isInteger(storedZoom) && storedZoom >= ZOOM_MIN && storedZoom <= ZOOM_MAX && storedZoom % ZOOM_STEP === 0)
     ? storedZoom
     : 100;
+
+// ===== Сенсорный экран: клавиатуры и курсора нет =====
+// Второй признак — грубый указатель (палец): часть телефонов на вопрос о курсоре отвечает неверно.
+const touchQuery = window.matchMedia('(hover: none), (pointer: coarse)');
 
 // ===== Дата последней редакции =====
 const DB_DATE_SEEN_KEY = STORAGE_PREFIX + 'db_date_seen';
@@ -91,12 +89,11 @@ function rememberCopied(article) {
     renderRecentRow();
 }
 
-// Строка «Недавно скопированные» над списком статей; при поиске и на «Общей информации» её нет.
+// Строка «Недавно скопированные» в шапке, под вкладками; при поиске и на «Общей информации» её нет.
 // Нажатие на номер копирует его снова, порядок в строке при этом не меняется.
 function renderRecentRow() {
-    const container = document.getElementById('articlesContainer');
-    const old = container.querySelector('.recent-row');
-    if (old) old.remove();
+    const row = document.getElementById('recentRow');
+    row.innerHTML = '';
     if (currentCode === 'pk' || articlesLoadState !== 'ready' || listShowsSearch) return;
 
     const articles = recentCopied
@@ -104,19 +101,19 @@ function renderRecentRow() {
         .filter(Boolean);
     if (articles.length === 0) return;
 
-    const row = document.createElement('div');
-    row.className = 'recent-row';
-    row.innerHTML = '<span class="recent-label">Недавно скопированные:</span>';
+    row.innerHTML = '<span class="label"><span class="r-full">Недавно скопированные</span><span class="r-short">Недавние</span></span>';
+    const chips = document.createElement('div');
+    chips.className = 'chips';
     articles.forEach(article => {
         const chip = document.createElement('button');
         chip.type = 'button';
-        chip.className = 'badge-num recent-chip';
+        chip.className = 'chip';
         chip.textContent = `ст. ${article.num} ${CODE_LABELS[article.code] || ''}`.trim();
         chip.title = `${article.title} — скопировать номер`;
         chip.addEventListener('click', () => copyArticleNumber(article, { remember: false }));
-        row.appendChild(chip);
+        chips.appendChild(chip);
     });
-    container.prepend(row);
+    row.appendChild(chips);
 }
 
 function isPinned(article) {
@@ -216,12 +213,12 @@ function updateStaleBanner() {
     const dateStr = new Date(savedAt).toLocaleString('ru-RU');
     const banner = document.createElement('div');
     banner.id = 'staleDataBanner';
-    banner.className = 'stale-banner';
+    banner.className = 'stale';
     banner.innerHTML = `
-        Не удалось обновить данные. Показана последняя сохранённая версия от ${dateStr}.
-        <button id="retryStaleBtn">Обновить</button>
+        <span>Не удалось обновить данные. Показана последняя сохранённая версия от ${dateStr}.</span>
+        <button id="retryStaleBtn" class="btn" type="button">Обновить</button>
     `;
-    document.querySelector('.controls-container').appendChild(banner);
+    document.querySelector('.top .wrap').appendChild(banner);
     document.getElementById('retryStaleBtn').addEventListener('click', reloadStaleSources);
 }
 
@@ -248,13 +245,13 @@ let proceduralLoadState = 'loading';
 function renderLoadState(container, state, errorText, onRetry) {
     container.className = '';
     if (state === 'loading') {
-        container.innerHTML = `<div class="loader">Синхронизация данных...</div>`;
+        container.innerHTML = `<div class="state-box"><div class="pulse"><i></i><i></i><i></i></div>Синхронизация данных...</div>`;
         return;
     }
     container.innerHTML = `
-        <div class="loader">
-            ${errorText}<br>
-            <button class="tab-btn retry-btn">Повторить попытку</button>
+        <div class="state-box">
+            <span>${errorText}</span>
+            <button type="button" class="btn retry-btn">Повторить попытку</button>
         </div>
     `;
     container.querySelector('.retry-btn').addEventListener('click', onRetry);
@@ -498,6 +495,11 @@ const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'
 
 function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
+}
+
+// Значок из набора в index.html.
+function icon(id, size) {
+    return `<svg width="${size}" height="${size}" aria-hidden="true"><use href="#${id}"/></svg>`;
 }
 
 // ===== Поиск: разбор запроса =====
@@ -989,44 +991,38 @@ function highlightArticleNum(num, query) {
     return wrapHighlightRanges(num, ranges);
 }
 
-// ===== Хелперы рендера статей (общие для карточек и списка) =====
+// ===== Хелперы рендера строки статьи =====
 
-// Бейдж типа статьи (Ф/Р и т.п.) с расшифровкой в title. Только для УК.
-function buildTypeBadge(article, extraClass = '') {
-    if (article.code !== 'uk') return '';
+// Ячейка типа статьи (Ф/Р и т.п.) с расшифровкой в title. Только для УК; пустая ячейка держит столбец.
+function buildTypeCell(article) {
     const safeType = escapeHtml(article.type);
-    if (!safeType || safeType === '-') return '';
-    const typeLabel = TYPE_LABELS[article.type] || '';
-    return `<div class="article-type ${extraClass}" title="${escapeHtml(typeLabel)}">${safeType}</div>`;
+    if (!safeType || safeType === '-') return '<div class="cell cell-type"></div>';
+    const typeLabel = TYPE_LABELS[article.type];
+    return `<div class="cell cell-type"${typeLabel ? ` title="${escapeHtml(typeLabel)}"` : ''}>${safeType}</div>`;
 }
 
-// Плашка кодекса (УК/АК/ДК) в цвет кодекса — только в результатах поиска.
-function buildCodeBadge(article, query, extraClass = '') {
-    const label = CODE_LABELS[article.code];
-    if (!query || !label) return '';
-    return `<div class="article-type article-code ${article.code} ${extraClass}" title="${CODE_NAMES[article.code] || ''}">${label}</div>`;
+// Ячейка кодекса (УК/АК/ДК) в цвет кодекса — только в результатах поиска.
+function buildCodeCell(article) {
+    return `<div class="cell code ${article.code}" title="${CODE_NAMES[article.code] || ''}">${CODE_LABELS[article.code] || ''}</div>`;
 }
 
-// Кнопка закрепления (иконка-булавка). size=15 в карточках, size=14 в списке.
-function buildPinButton(article, size) {
+// Кнопка закрепления (иконка-булавка).
+function buildPinButton(article) {
     const pinned = isPinned(article);
     const label = pinned ? 'Открепить статью' : 'Закрепить статью';
-    return `<button class="pin-btn" title="${label}" aria-label="${label}" aria-pressed="${pinned}"><svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 4V11L6 15V17H18V15L15 11V4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 17V21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 4H17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>`;
+    return `<button type="button" class="pin" title="${label}" aria-label="${label}" aria-pressed="${pinned}">${icon('i-pin', 14)}</button>`;
 }
 
-// Общие обработчики карточки/строки: копирование номера, пин.
-// stopPropagation нужен для списка — строка целиком кликабельна (раскрытие описания).
-function attachArticleHandlers(root, article, { stopPropagation = false } = {}) {
-    const numBadge = root.querySelector('.badge-num');
-    numBadge.title = 'Скопировать номер статьи';
-    numBadge.addEventListener('click', (e) => {
-        if (stopPropagation) e.stopPropagation();
-        copyArticleNumber(article);
+// Обработчики строки: копирование номера, пин.
+// stopPropagation нужен, потому что строка целиком кликабельна (раскрытие описания).
+function attachArticleHandlers(row, article) {
+    row.querySelector('.num').addEventListener('click', (e) => {
+        e.stopPropagation();
+        copyArticleNumber(article, { cell: e.currentTarget });
     });
 
-    const pinBtn = root.querySelector('.pin-btn');
-    pinBtn.addEventListener('click', (e) => {
-        if (stopPropagation) e.stopPropagation();
+    row.querySelector('.pin').addEventListener('click', (e) => {
+        e.stopPropagation();
         togglePinned(article);
     });
 }
@@ -1038,22 +1034,28 @@ const TOAST_DURATION_MS = 1800;
 const WELCOME_TOAST_DURATION_MS = 3000;
 let toastEl = null;
 let toastHideTimer = null;
-function showToast(message, duration = TOAST_DURATION_MS) {
+function showToast(message, duration = TOAST_DURATION_MS, strong = '') {
     if (!toastEl) {
         toastEl = document.createElement('div');
         toastEl.className = 'toast';
         document.body.appendChild(toastEl);
     }
     toastEl.textContent = message;
+    // strong — вторая часть сообщения, жирным (номер скопированной статьи).
+    if (strong) {
+        const bold = document.createElement('b');
+        bold.textContent = strong;
+        toastEl.appendChild(bold);
+    }
 
     clearTimeout(toastHideTimer);
-    toastEl.classList.remove('toast-visible');
+    toastEl.classList.remove('on');
     // Форсируем reflow — иначе CSS-переход не перезапустится при быстром повторном клике.
     void toastEl.offsetWidth;
-    toastEl.classList.add('toast-visible');
+    toastEl.classList.add('on');
 
     toastHideTimer = setTimeout(() => {
-        toastEl.classList.remove('toast-visible');
+        toastEl.classList.remove('on');
     }, duration);
 }
 
@@ -1064,7 +1066,21 @@ function showWelcomeToast() {
     showToast('Памятка по законодательной базе Orlando', WELCOME_TOAST_DURATION_MS);
 }
 
-function copyArticleNumber(article, { remember = true } = {}) {
+// Ячейка номера ненадолго показывает «Скопировано».
+const COPIED_FLASH_MS = 1200;
+function flashCopied(cell) {
+    if (cell.classList.contains('copied')) return;
+    const old = cell.innerHTML;
+    cell.classList.add('copied');
+    cell.innerHTML = `${icon('i-check', 14)}Скопировано`;
+    setTimeout(() => {
+        cell.classList.remove('copied');
+        cell.innerHTML = old;
+    }, COPIED_FLASH_MS);
+}
+
+// cell — ячейка номера в списке; при копировании из строки «Недавно скопированные» её нет.
+function copyArticleNumber(article, { remember = true, cell = null } = {}) {
     const codeLabel = CODE_LABELS[article.code] || '';
     const text = `ст. ${article.num} ${codeLabel}`.trim();
 
@@ -1080,7 +1096,8 @@ function copyArticleNumber(article, { remember = true } = {}) {
 
     navigator.clipboard.writeText(text)
         .then(() => {
-            showToast(`Скопировано: ${text}`);
+            showToast('Скопировано:', TOAST_DURATION_MS, text);
+            if (cell) flashCopied(cell);
             if (remember) rememberCopied(article);
         })
         .catch(onFail);
@@ -1088,23 +1105,23 @@ function copyArticleNumber(article, { remember = true } = {}) {
 
 // ===== Основной рендер =====
 
-// Строка «Найдено» над выдачей поиска: сколько статей в каждом кодексе и отбор по кодексу.
+// Строка «Найдено» в шапке, под вкладками: сколько статей в каждом кодексе и отбор по кодексу.
 // Показывается, только когда найденное лежит в нескольких кодексах.
-function renderFoundRow(container, counts) {
+function renderFoundRow(counts) {
     const codes = Object.keys(CODE_LABELS).filter(code => counts[code]);
     if (codes.length < 2) return;
 
     const total = codes.reduce((sum, code) => sum + counts[code], 0);
-    const row = document.createElement('div');
-    row.className = 'found-row';
-    row.innerHTML = '<span class="found-label">Найдено:</span>'
-        + `<button type="button" class="found-chip" data-code="" title="Показать всё найденное">Все ${total}</button>`
-        + codes.map(code => `<button type="button" class="found-chip" data-code="${code}" title="Показать только найденное в ${CODE_LABELS[code]}"><span class="found-code ${code}">${CODE_LABELS[code]}</span>${counts[code]}</button>`).join('');
+    const row = document.getElementById('foundRow');
+    row.innerHTML = '<span class="label">Найдено</span><div class="chips">'
+        + `<button type="button" class="chip" data-code="" title="Показать всё найденное">Все ${total}</button>`
+        + codes.map(code => `<button type="button" class="chip" data-code="${code}" title="Показать только найденное в ${CODE_LABELS[code]}"><i class="dot ${code}"></i>${CODE_LABELS[code]} ${counts[code]}</button>`).join('')
+        + '</div><div class="keys"><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd></div>';
 
-    row.querySelectorAll('.found-chip').forEach(chip => {
+    row.querySelectorAll('.chip').forEach(chip => {
         const code = chip.dataset.code || null;
         const isActive = code === searchCodeFilter;
-        chip.classList.toggle('active', isActive);
+        chip.classList.toggle('on', isActive);
         chip.setAttribute('aria-pressed', isActive ? 'true' : 'false');
         chip.addEventListener('click', () => {
             if (code === searchCodeFilter) return;
@@ -1112,7 +1129,6 @@ function renderFoundRow(container, counts) {
             renderArticles();
         });
     });
-    container.prepend(row);
 }
 
 function renderArticles({ keepExpanded = false } = {}) {
@@ -1121,10 +1137,11 @@ function renderArticles({ keepExpanded = false } = {}) {
     const rawQuery = document.getElementById('searchInput').value;
     renderedSearchText = rawQuery;
     listShowsSearch = false;
-    if (!keepExpanded) {
-        keyboardSelectedId = null;
-        foundRowKeysActive = false;
-    }
+    if (!keepExpanded) keyboardSelectedId = null;
+    syncKeyHintState();
+
+    document.getElementById('foundRow').innerHTML = '';
+    document.getElementById('recentRow').innerHTML = '';
 
     const tabs = document.querySelector('.tabs');
     tabs.classList.remove('searching');
@@ -1140,7 +1157,7 @@ function renderArticles({ keepExpanded = false } = {}) {
 
     if (articlesLoadState !== 'ready') {
         renderLoadState(container, articlesLoadState,
-            'Не удалось загрузить базу данных. Проверьте интернет-соединение и попробуйте снова.', retryArticles);
+            'Не удалось загрузить базу данных.<br>Проверьте интернет-соединение и попробуйте снова.', retryArticles);
         return;
     }
 
@@ -1174,11 +1191,11 @@ function renderArticles({ keepExpanded = false } = {}) {
 
     const expandedIds = new Set();
     if (keepExpanded) {
-        container.querySelectorAll('.row.expanded').forEach(row => expandedIds.add(row.dataset.articleId));
+        container.querySelectorAll('.row.open').forEach(row => expandedIds.add(row.dataset.articleId));
     }
 
     container.innerHTML = "";
-    container.className = currentView === 'list' ? 'list-view' : '';
+    container.className = 'list';
 
     if (matchedArticles.length === 0) {
         const examplesHtml = query
@@ -1188,14 +1205,10 @@ function renderArticles({ keepExpanded = false } = {}) {
         return;
     }
 
-    if (currentView === 'list') {
-        renderAsList(container, matchedArticles, query, expandedIds);
-    } else {
-        renderAsCards(container, matchedArticles, query);
-    }
+    renderAsList(container, matchedArticles, query, expandedIds);
     restoreKeyboardSelection();
     renderRecentRow();
-    if (query) renderFoundRow(container, counts);
+    if (query) renderFoundRow(counts);
 
     if (!query && currentDisplayMode === 'compact') {
         const total = parsedDatabase.filter(article => article.code === currentCode).length;
@@ -1207,7 +1220,7 @@ function renderArticles({ keepExpanded = false } = {}) {
 function renderCompactHint(container, shown, total) {
     const hint = document.createElement('div');
     hint.className = 'list-hint';
-    hint.innerHTML = `Показаны основные статьи: ${shown} из ${total}. <button type="button" class="list-hint-btn">Показать все</button>`;
+    hint.innerHTML = `Показаны основные статьи: ${shown} из ${total}. <button type="button" class="btn list-hint-btn">Показать все</button>`;
     hint.querySelector('.list-hint-btn').addEventListener('click', () => {
         setDisplayMode('full');
         scrollToListTop();
@@ -1236,16 +1249,17 @@ function starsTitle(article) {
     return `${count} ${pluralizeStars(count)}`;
 }
 
-// В списке диапазон звёзд показывается коротко: «★★–★★★».
-function starsShort(stars) {
-    const runs = stars.match(/★+/g);
-    return runs && runs.length > 1 ? `${runs[0]}–${runs[runs.length - 1]}` : stars;
-}
-
-function buildStarsTag(article) {
-    const short = starsShort(article.stars);
-    const rangeClass = short !== article.stars ? 'row-stars-range' : '';
-    return `<div class="row-tag row-slot-stars ${rangeClass}" title="${starsTitle(article)}">${escapeHtml(short) || '—'}</div>`;
+// Звёзды розыска: пять мест; у диапазона места от минимума до максимума — бледные.
+function buildStarsHtml(article) {
+    const runs = article.stars.match(/★+/g);
+    if (!runs) return escapeHtml(article.stars);
+    const min = runs[0].length;
+    const max = runs[runs.length - 1].length;
+    let html = '<div class="stars">';
+    for (let i = 1; i <= 5; i++) {
+        html += `<i class="star${i <= min ? ' on' : i <= max ? ' maybe' : ''}"></i>`;
+    }
+    return html + '</div>';
 }
 
 function buildHighlightedFields(article, query) {
@@ -1254,52 +1268,6 @@ function buildHighlightedFields(article, query) {
         num: highlightArticleNum(article.num, query),
         desc: highlightText(article.desc, query).replace(/\n/g, '<br>'),
     };
-}
-
-// ===== Отрисовка: карточки =====
-
-// Фильтрация/поиск/сортировка уже выполнены в renderArticles() — здесь только разметка.
-function renderAsCards(container, matchedArticles, query) {
-    matchedArticles.forEach(item => {
-        const article = item.article;
-
-        const card = document.createElement('div');
-        card.className = `card ${article.code} ${isPinned(article) ? 'pinned' : ''}`;
-        card.dataset.articleId = articleId(article);
-
-        const { title: highlightedTitle, num: highlightedNum, desc: highlightedDesc } =
-            buildHighlightedFields(article, query);
-
-        const typeHtml = buildTypeBadge(article);
-
-        const safeFine = escapeHtml(article.fine);
-        const safeStars = escapeHtml(article.stars);
-        const safeArrest = escapeHtml(article.arrest);
-        const safeFelony = escapeHtml(article.felony);
-        const safeExtraMeasure = escapeHtml(article.extraMeasure);
-
-        card.innerHTML = `
-            <div class="card-header">
-                <div class="title-row">
-                    ${buildPinButton(article, 15)}
-                    <div class="title" title="${escapeHtml(article.title)}">${highlightedTitle}</div>
-                </div>
-                <div class="card-header-right">${buildCodeBadge(article, query)}${typeHtml}<div class="badge-num">ст. ${highlightedNum}</div></div>
-            </div>
-            <div class="info-table">
-                <div class="info-row"><div class="info-label">Штраф</div><div class="info-val">${safeFine || '—'}</div></div>
-                <div class="info-row"><div class="info-label">Розыск</div><div class="info-val">${safeStars || '—'}</div></div>
-                <div class="info-row"><div class="info-label">Арест</div><div class="info-val">${safeArrest || '—'}</div></div>
-                <div class="info-row"><div class="info-label">Судимость</div><div class="info-val ${hasFelonyRecord(article) ? 'danger' : ''}">${safeFelony || '—'}</div></div>
-                <div class="info-row"><div class="info-label">Доп. мера</div><div class="info-val">${safeExtraMeasure || '—'}</div></div>
-            </div>
-            <div class="desc">${highlightedDesc}</div>
-        `;
-
-        attachArticleHandlers(card, article);
-
-        container.appendChild(card);
-    });
 }
 
 // ===== Другие части статьи =====
@@ -1332,15 +1300,18 @@ function buildPartsHtml(article) {
     const base = articleBaseNum(article);
     const pills = siblings.map(item => {
         const part = item.num.slice(base.length).trim() || `ст. ${item.num}`;
-        return `<button type="button" class="row-part" data-part-id="${escapeHtml(articleId(item))}" title="ст. ${escapeHtml(item.num)} — ${escapeHtml(item.title)}"><span class="row-part-num">${escapeHtml(part)}</span><span class="row-part-title">${escapeHtml(item.title)}</span></button>`;
+        return `<button type="button" class="part" data-part-id="${escapeHtml(articleId(item))}" title="ст. ${escapeHtml(item.num)} — ${escapeHtml(item.title)}"><b>${escapeHtml(part)}</b><span>${escapeHtml(item.title)}</span></button>`;
     }).join('');
-    return `<div class="row-parts"><span class="row-parts-label">Другие части статьи:</span>${pills}</div>`;
+    return `<div class="parts"><span class="label">Другие части</span><div class="parts-list">${pills}</div></div>`;
 }
 
-// Прокрутка к строке или плитке так, чтобы она не оказалась под закреплённой шапкой.
+// Прокрутка к строке так, чтобы она не оказалась под закреплённой шапкой или под полосой подсказок.
 function revealInList(el, smooth = false) {
-    el.style.scrollMarginTop = `${document.querySelector('.controls-container').offsetHeight}px`;
-    el.style.scrollMarginBottom = '12px';
+    // На низком экране шапка не прилипает и строку не закрывает.
+    const header = document.querySelector('.top');
+    const sticky = getComputedStyle(header).position === 'sticky';
+    el.style.scrollMarginTop = `${(sticky ? header.offsetHeight : 0) + 8}px`;
+    el.style.scrollMarginBottom = `${document.querySelector('.keybar').offsetHeight + 12}px`;
     el.scrollIntoView({ block: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
 }
 
@@ -1363,8 +1334,8 @@ function openArticlePart(fromRow, id, query) {
         anchor.after(target);
         void target.offsetWidth; // чтобы раскрытие вставленной строки было плавным
     }
-    target.classList.add('expanded');
-    target.querySelector('.row-header').setAttribute('aria-expanded', 'true');
+    target.classList.add('open');
+    target.querySelector('.grid').setAttribute('aria-expanded', 'true');
     revealInList(target, true);
 }
 
@@ -1378,100 +1349,94 @@ function renderAsList(container, matchedArticles, query, expandedIds) {
     });
 }
 
-function buildListRow(article, query, isExpanded) {
-    const row = document.createElement('div');
-    row.className = `row ${article.code} ${isPinned(article) ? 'pinned' : ''} ${isExpanded ? 'expanded' : ''}`;
-    row.dataset.articleId = articleId(article);
+// Ширины столбцов строки в раскладке «таблица».
+const ROW_COLS = {
+    bar: '4px', code: '44px', num: '164px', type: '50px', title: 'minmax(0, 1fr)',
+    extraUk: 'var(--w-extra-uk, 240px)', extra: '280px', fine: '208px', stars: '104px', term: '132px', chev: '40px'
+};
 
+// Значение переносится только перед указанным словом: срок — перед «или», штраф — перед «до».
+function wrapBeforeWord(text, word) {
+    return text.split(new RegExp(`\\s+(?=${word}\\s)`))
+        .map(part => `<span class="nw">${escapeHtml(part)}</span>`).join(' ');
+}
+
+function buildListRow(article, query, isExpanded) {
+    const isUk = article.code === 'uk';
+    const hasFelony = hasFelonyRecord(article);
     const { title: highlightedTitle, num: highlightedNum, desc: highlightedDesc } =
         buildHighlightedFields(article, query);
 
-    const typeHtml = buildTypeBadge(article, 'row-slot-type');
-
-    // row-slot-* — фиксированная ширина, заголовок начинается в одной позиции.
-    const leftHtml = `
-        ${buildCodeBadge(article, query, 'row-slot-code')}
-        ${typeHtml}
-        <div class="badge-num row-num row-slot-num">ст. ${highlightedNum}</div>
-        <div class="row-title" title="${escapeHtml(article.title)}">${buildPinButton(article, 14)}${highlightedTitle}</div>
-    `;
-
-    // УК — штраф/звёзды/арест, доп. мера — только если заполнена.
-    // АК и ДК — доп. мера/штраф, звёзды и арест — только если заполнены. row-slot-* держат ширину.
-    let rightHtml = '';
-    if (article.code === 'uk') {
-        const safeFine = escapeHtml(article.fine);
-        const safeArrest = escapeHtml(article.arrest);
-        const hasFelony = hasFelonyRecord(article);
-        const arrestTitle = safeArrest
-            ? `${safeArrest}, ${hasFelony ? 'судимость' : 'без судимости'}`
-            : 'Арест';
-        // Доп. мера у статьи УК: плашка слева от штрафа, остальные колонки не сдвигаются.
-        const safeExtraMeasure = escapeHtml(article.extraMeasure);
-        const extraHtml = safeExtraMeasure
-            ? `<div class="row-tag row-slot-extra" title="${safeExtraMeasure}">${safeExtraMeasure}</div>`
-            : '';
-
-        rightHtml = `
-            ${extraHtml}
-            <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="${safeFine ? `Штраф: ${safeFine}` : 'Штраф'}">${safeFine || '—'}</div>
-            ${buildStarsTag(article)}
-            <div class="row-tag row-slot-arrest ${hasFelony ? 'row-danger' : ''}" title="${arrestTitle}">${safeArrest || '—'}</div>
-        `;
-    } else {
-        const safeExtraMeasure = escapeHtml(article.extraMeasure);
-        const safeFine = escapeHtml(article.fine);
-        const hasExtraMeasure = Boolean(article.extraMeasure);
-        let extraHtml = `<div class="row-tag row-slot-extra ${hasExtraMeasure ? '' : 'row-hidden'}" title="${hasExtraMeasure ? safeExtraMeasure : ''}">${safeExtraMeasure}</div>`;
-        // Звёзды и арест у статьи АК или ДК: плашки встают на место пустой доп. меры, вплотную к штрафу.
-        const safeArrest = escapeHtml(article.arrest);
-        const penaltyHtml = (article.stars ? buildStarsTag(article) : '')
-            + (safeArrest ? `<div class="row-tag row-slot-arrest" title="Арест: ${safeArrest}">${safeArrest}</div>` : '');
-        if (penaltyHtml) {
-            extraHtml = hasExtraMeasure
-                ? penaltyHtml + extraHtml
-                : `<div class="row-slot-holder">${penaltyHtml}</div>`;
-        }
-
-        rightHtml = `
-            ${extraHtml}
-            <div class="row-tag row-slot-fine ${safeFine ? 'row-fine' : ''}" title="${safeFine ? `Штраф: ${safeFine}` : 'Штраф'}">${safeFine || '—'}</div>
-        `;
+    const safeFine = escapeHtml(article.fine);
+    const safeArrest = escapeHtml(article.arrest);
+    const safeExtraMeasure = escapeHtml(article.extraMeasure);
+    let arrestTitle = 'Арест';
+    if (safeArrest) {
+        arrestTitle = isUk ? `${safeArrest}, ${hasFelony ? 'судимость' : 'без судимости'}` : `Арест: ${safeArrest}`;
     }
+    const extraHtml = `<div class="cell extra" title="${safeExtraMeasure}">${safeExtraMeasure}</div>`;
 
-    const partsHtml = buildPartsHtml(article);
+    const cells = {
+        code: buildCodeCell(article),
+        num: `<div class="cell num" title="Скопировать номер статьи"><span class="num-text">ст. ${highlightedNum}</span><span class="ico">${icon('i-copy', 14)}</span></div>`,
+        type: buildTypeCell(article),
+        title: `<div class="cell cell-title">${buildPinButton(article)}<span title="${escapeHtml(article.title)}">${highlightedTitle}</span></div>`,
+        extraUk: extraHtml,
+        extra: extraHtml,
+        fine: safeFine
+            ? `<div class="cell money" title="Штраф: ${safeFine}"><span>${wrapBeforeWord(article.fine, 'до')}</span></div>`
+            : '<div class="cell empty" title="Штраф">—</div>',
+        stars: `<div class="cell" title="${starsTitle(article)}">${buildStarsHtml(article) || '<span class="empty">—</span>'}</div>`,
+        term: safeArrest
+            ? `<div class="cell term ${hasFelony ? 'felony' : ''}" title="${arrestTitle}"><span>${wrapBeforeWord(article.arrest, 'или')}</span>${hasFelony ? '<span class="fel-cap">судимость</span>' : ''}</div>`
+            : `<div class="cell empty" title="${arrestTitle}">—</div>`
+    };
+
+    // УК — [доп. мера], штраф, звёзды, срок. АК и ДК — [звёзды, срок], [доп. мера], штраф.
+    // Доп. мера, а у АК и ДК и звёзды со сроком — только если заполнены.
+    const hasPenalty = Boolean(article.stars || article.arrest);
+    const mainCols = [query && 'code', 'num', isUk && 'type', 'title'].filter(Boolean);
+    const penCols = (isUk
+        ? [article.extraMeasure && 'extraUk', 'fine', 'stars', 'term']
+        : [hasPenalty && 'stars', hasPenalty && 'term', article.extraMeasure && 'extra', 'fine']).filter(Boolean);
+    const cols = ['bar', ...mainCols, ...penCols, 'chev'].map(name => ROW_COLS[name]).join(' ');
+
+    const row = document.createElement('div');
+    row.className = `row ${article.code} ${penCols.length === 1 ? 'single' : ''} ${isPinned(article) ? 'pinned' : ''} ${isExpanded ? 'open' : ''}`;
+    row.dataset.articleId = articleId(article);
 
     row.innerHTML = `
-        <div class="row-header" role="button" tabindex="0" aria-expanded="${isExpanded}">
-            <div class="row-left">${leftHtml}</div>
-            <div class="row-right">${rightHtml}</div>
-            <svg class="row-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+        <div class="grid" style="--cols: ${cols}" role="button" tabindex="0" aria-expanded="${isExpanded}">
+            <div class="row-bar"></div>
+            <div class="row-main">${mainCols.map(name => cells[name]).join('')}</div>
+            <div class="row-pen">${penCols.map(name => cells[name]).join('')}</div>
+            <div class="cell cell-chev">${icon('i-chev', 14)}</div>
         </div>
-        <div class="row-desc-wrapper">
-            <div class="row-desc-inner">
-                <div class="row-desc ${partsHtml ? 'row-desc-with-parts' : ''}">${highlightedDesc}</div>
-                ${partsHtml}
+        <div class="row-body">
+            <div class="row-body-in">
+                <div class="row-body-pad">
+                    <div class="row-desc">${highlightedDesc}</div>
+                    ${buildPartsHtml(article)}
+                </div>
             </div>
         </div>
     `;
 
-    attachArticleHandlers(row, article, { stopPropagation: true });
+    attachArticleHandlers(row, article);
 
-    row.querySelectorAll('.row-part').forEach(btn => btn.addEventListener('click', () => {
+    row.querySelectorAll('.part').forEach(btn => btn.addEventListener('click', () => {
         openArticlePart(row, btn.dataset.partId, query);
     }));
 
-    const header = row.querySelector('.row-header');
+    const header = row.querySelector('.grid');
     const toggleExpanded = () => {
-        const willExpand = !row.classList.contains('expanded');
-        row.classList.toggle('expanded', willExpand);
+        const willExpand = !row.classList.contains('open');
+        row.classList.toggle('open', willExpand);
         header.setAttribute('aria-expanded', String(willExpand));
     };
     header.addEventListener('click', toggleExpanded);
     header.addEventListener('keydown', (e) => {
-        if (e.target.closest('.pin-btn')) return;
+        if (e.target.closest('.pin')) return;
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             toggleExpanded();
@@ -1489,16 +1454,16 @@ const PK_TEMPLATES = {
 
 function buildPkItems(content, query) {
     return content.split('\n').map(s => s.trim()).filter(Boolean)
-        .map(line => `<li>${highlightText(line, query)}</li>`).join('');
+        .map(line => `<li><span>${highlightText(line, query)}</span></li>`).join('');
 }
 
 function renderPkSteps(content, query) {
-    return `<ol class="pk-steps">${buildPkItems(content, query)}</ol>`;
+    return `<ol>${buildPkItems(content, query)}</ol>`;
 }
 
 // Маркированный список — порядок пунктов не важен (в отличие от "steps")
 function renderPkList(content, query) {
-    return `<ul class="pk-list">${buildPkItems(content, query)}</ul>`;
+    return `<ul>${buildPkItems(content, query)}</ul>`;
 }
 
 // Safe-fallback для "text" и неизвестных значений — карточка не теряется молча.
@@ -1514,7 +1479,7 @@ function renderProceduralCardBody(item, query) {
 function renderProceduralCards(container, query = null) {
     if (proceduralLoadState !== 'ready') {
         renderLoadState(container, proceduralLoadState,
-            'Не удалось загрузить раздел. Проверьте интернет-соединение и попробуйте снова.', retryProcedural);
+            'Не удалось загрузить раздел.<br>Проверьте интернет-соединение и попробуйте снова.', retryProcedural);
         return;
     }
 
@@ -1532,51 +1497,66 @@ function renderProceduralCards(container, query = null) {
         return;
     }
 
+    container.className = 'info';
     items.forEach(item => {
         const card = document.createElement('div');
-        card.className = 'card pk';
+        card.className = 'info-card';
 
         card.innerHTML = `
-            <div class="card-header">
-                <div class="title" title="${escapeHtml(item.title)}">${highlightText(item.title, query)}</div>
-            </div>
-            <div class="pk-body">${renderProceduralCardBody(item, query)}</div>
+            <div class="info-title" title="${escapeHtml(item.title)}">${highlightText(item.title, query)}</div>
+            <div class="info-body">${renderProceduralCardBody(item, query)}</div>
         `;
         container.appendChild(card);
     });
 }
 
+// Раскладка «карточки» (телефон) — при ширине страницы до 639 px, как в style.css.
+function isCardsLayout() {
+    return document.querySelector('.app').clientWidth <= 639;
+}
+
 const SEARCH_PLACEHOLDER_DEFAULT = document.getElementById('searchInput').placeholder;
+const SEARCH_PLACEHOLDER_SHORT = 'Ситуация, слово или номер...';
 const SEARCH_PLACEHOLDER_PK = 'Поиск по общей информации...';
 
-document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', (e) => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    e.currentTarget.classList.add('active');
+function syncSearchPlaceholder() {
+    const narrow = isCardsLayout() ? SEARCH_PLACEHOLDER_SHORT : SEARCH_PLACEHOLDER_DEFAULT;
+    document.getElementById('searchInput').placeholder = currentCode === 'pk' ? SEARCH_PLACEHOLDER_PK : narrow;
+}
+
+document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', (e) => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('on'));
+    e.currentTarget.classList.add('on');
     currentCode = e.currentTarget.getAttribute('data-code');
-    
+
     clearTimeout(searchDebounceTimer);
     const searchInput = document.getElementById('searchInput');
     if (searchInput.value !== "") {
         searchInput.value = "";
     }
     syncSearchClearBtn();
-    searchInput.placeholder = currentCode === 'pk' ? SEARCH_PLACEHOLDER_PK : SEARCH_PLACEHOLDER_DEFAULT;
+    syncSearchPlaceholder();
     renderArticles();
+    swapInList();
     scrollToListTop();
 }));
 
-// ===== Переключатели: режим отображения и вид =====
-
-function syncToggleUI(selector, attribute, value) {
-    document.querySelectorAll(selector).forEach(btn => {
-        const isActive = btn.getAttribute(attribute) === value;
-        btn.classList.toggle('active', isActive);
-        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-    });
+// Список появляется коротким движением при смене вкладки или режима; при наборе запроса — нет.
+function swapInList() {
+    const container = document.getElementById('articlesContainer');
+    container.classList.remove('swap');
+    void container.offsetWidth;
+    container.classList.add('swap');
 }
 
+// ===== Переключатель режима отображения =====
+
 function syncModeToggleUI() {
-    syncToggleUI('.mode-btn', 'data-mode', currentDisplayMode);
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        const isActive = btn.getAttribute('data-mode') === currentDisplayMode;
+        btn.classList.toggle('on', isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
 }
 
 const DISPLAY_MODE_TOAST = {
@@ -1590,6 +1570,7 @@ function setDisplayMode(selectedMode) {
     localStorage.setItem(DISPLAY_MODE_KEY, currentDisplayMode);
     syncModeToggleUI();
     renderArticles();
+    swapInList();
     showToast(DISPLAY_MODE_TOAST[currentDisplayMode]);
 }
 
@@ -1599,30 +1580,30 @@ document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('clic
 
 syncModeToggleUI();
 
-function syncViewToggleUI() {
-    syncToggleUI('.view-btn', 'data-view', currentView);
+// ===== Подсказки клавиш: полоса внизу и значки клавиш =====
+const KEY_HINTS_KEY = STORAGE_PREFIX + 'key_hints';
+let keyHintsOn = localStorage.getItem(KEY_HINTS_KEY) !== 'off';
+
+function syncKeyHintsUI() {
+    document.body.classList.toggle('keys-on', keyHintsOn && !touchQuery.matches);
+    document.querySelectorAll('.hints-btn').forEach(btn => {
+        const isActive = (btn.getAttribute('data-hints') === 'on') === keyHintsOn;
+        btn.classList.toggle('on', isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
 }
 
-const VIEW_TOAST = {
-    grid: 'Вид: плитки',
-    list: 'Вид: список'
-};
-
-document.querySelectorAll('.view-btn').forEach(btn => btn.addEventListener('click', (e) => {
-    const selectedView = e.currentTarget.getAttribute('data-view');
-    if (selectedView === currentView) return;
-    currentView = selectedView;
-    localStorage.setItem(VIEW_KEY, currentView);
-    syncViewToggleUI();
-    renderArticles();
-    showToast(VIEW_TOAST[currentView]);
+document.querySelectorAll('.hints-btn').forEach(btn => btn.addEventListener('click', (e) => {
+    keyHintsOn = e.currentTarget.getAttribute('data-hints') === 'on';
+    localStorage.setItem(KEY_HINTS_KEY, keyHintsOn ? 'on' : 'off');
+    syncKeyHintsUI();
 }));
 
-syncViewToggleUI();
+syncKeyHintsUI();
 
 // ===== Масштаб страницы =====
 function applyZoom() {
-    document.documentElement.style.zoom = currentZoom + '%';
+    document.documentElement.style.zoom = (touchQuery.matches ? 100 : currentZoom) + '%';
 }
 
 const zoomValue = document.getElementById('zoomValue');
@@ -1655,19 +1636,49 @@ zoomPlusBtn.addEventListener('click', () => {
 applyZoom();
 updateZoomUI();
 
+// ===== Сенсорный экран =====
+// Подсказки клавиш и масштаб на нём не действуют.
+function syncTouchMode() {
+    document.body.classList.toggle('touch', touchQuery.matches);
+    syncKeyHintsUI();
+    applyZoom();
+}
+
+touchQuery.addEventListener('change', syncTouchMode);
+syncTouchMode();
+
 // ===== Панель настроек (шестерёнка) =====
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsPanel = document.getElementById('settingsPanel');
 
+// Уведомление встаёт над открытым листом настроек, а не под ним: высота листа уходит в --sheet-h.
+function syncSheetHeight() {
+    const sheetOpen = settingsPanel.classList.contains('open') && settingsPanel.classList.contains('sheet');
+    document.body.style.setProperty('--sheet-h', sheetOpen ? `${settingsPanel.offsetHeight}px` : '0px');
+}
+
 function closeSettingsPanel() {
     settingsPanel.classList.remove('open');
     settingsBtn.setAttribute('aria-expanded', 'false');
+    syncSheetHeight();
+}
+
+// В раскладке «карточки» панель — лист у нижнего края окна. Лист переносится из шапки в конец страницы:
+// внутри .app его position: fixed мог бы отсчитываться от страницы, а не от окна.
+const settingsWrapper = settingsPanel.parentElement;
+
+function placeSettingsPanel() {
+    const asSheet = isCardsLayout();
+    settingsPanel.classList.toggle('sheet', asSheet);
+    (asSheet ? document.body : settingsWrapper).appendChild(settingsPanel);
 }
 
 function toggleSettingsPanel() {
     const willOpen = !settingsPanel.classList.contains('open');
+    if (willOpen) placeSettingsPanel();
     settingsPanel.classList.toggle('open', willOpen);
     settingsBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    syncSheetHeight();
 }
 
 settingsBtn.addEventListener('click', (e) => {
@@ -1678,6 +1689,8 @@ settingsBtn.addEventListener('click', (e) => {
 settingsPanel.addEventListener('click', (e) => {
     e.stopPropagation();
 });
+
+document.getElementById('settingsCloseBtn').addEventListener('click', closeSettingsPanel);
 
 document.addEventListener('click', () => {
     closeSettingsPanel();
@@ -1702,7 +1715,7 @@ const scrollTopBtn = document.getElementById('scrollTopBtn');
 let scrollTicking = false;
 
 function updateScrollTopVisibility() {
-    scrollTopBtn.classList.toggle('visible', window.scrollY > SCROLL_TOP_THRESHOLD);
+    scrollTopBtn.classList.toggle('on', window.scrollY > SCROLL_TOP_THRESHOLD);
     scrollTicking = false;
 }
 
@@ -1725,9 +1738,9 @@ updateScrollTopVisibility();
 const searchField = document.getElementById('searchInput');
 const searchClearBtn = document.getElementById('searchClearBtn');
 
+// Пока в поле есть текст, видны крестик и значок Esc, а стрелки у вкладок скрыты.
 function syncSearchClearBtn() {
-    if (!searchClearBtn) return;
-    searchClearBtn.classList.toggle('visible', searchField.value !== '');
+    document.body.classList.toggle('has-query', searchField.value !== '');
 }
 
 function clearSearch() {
@@ -1756,11 +1769,18 @@ function articleElements() {
     return Array.from(document.querySelectorAll('#articlesContainer [data-article-id]'));
 }
 
+// Полоса подсказок показывает клавиши по обстановке: выбрана ли статья, открыта ли «Общая информация».
+function syncKeyHintState() {
+    document.body.classList.toggle('is-selected', Boolean(keyboardSelectedId));
+    document.body.classList.toggle('on-info', currentCode === 'pk');
+}
+
 function selectByKeyboard(el) {
-    document.querySelectorAll('#articlesContainer .kbd-selected').forEach(other => other.classList.remove('kbd-selected'));
+    document.querySelectorAll('#articlesContainer .selected').forEach(other => other.classList.remove('selected'));
     keyboardSelectedId = el ? el.dataset.articleId : null;
+    syncKeyHintState();
     if (!el) return;
-    el.classList.add('kbd-selected');
+    el.classList.add('selected');
     revealInList(el);
 }
 
@@ -1768,8 +1788,9 @@ function selectByKeyboard(el) {
 function restoreKeyboardSelection() {
     if (!keyboardSelectedId) return;
     const el = articleElements().find(item => item.dataset.articleId === keyboardSelectedId);
-    if (el) el.classList.add('kbd-selected');
+    if (el) el.classList.add('selected');
     else keyboardSelectedId = null;
+    syncKeyHintState();
 }
 
 // Набранный запрос применяется сразу, без ожидания паузы после ввода: иначе клавиша сработала бы
@@ -1780,17 +1801,15 @@ function applyPendingSearch() {
 }
 
 // Переход по кнопкам строки «Найдено» стрелками влево и вправо; после перехода выбрана первая статья выдачи.
-// В плитках статья не выбирается: иначе следующая стрелка досталась бы плиткам, а не строке «Найдено».
 // Возвращает false, если строки «Найдено» нет.
 function shiftFoundCategory(step) {
-    const chips = Array.from(document.querySelectorAll('#articlesContainer .found-chip'));
+    const chips = Array.from(document.querySelectorAll('#foundRow .chip'));
     if (chips.length === 0) return false;
-    const next = chips[chips.findIndex(chip => chip.classList.contains('active')) + step];
+    const next = chips[chips.findIndex(chip => chip.classList.contains('on')) + step];
     if (next) {
         searchCodeFilter = next.dataset.code || null;
         renderArticles();
-        if (currentView === 'grid') foundRowKeysActive = true;
-        else selectByKeyboard(articleElements()[0] || null);
+        selectByKeyboard(articleElements()[0] || null);
         scrollToListTop();
     }
     return true;
@@ -1798,40 +1817,26 @@ function shiftFoundCategory(step) {
 
 // Переход на соседнюю вкладку стрелками влево и вправо, когда поиска нет.
 function shiftTab(step) {
-    const tabs = Array.from(document.querySelectorAll('.tab-btn'));
-    const next = tabs[tabs.findIndex(tab => tab.classList.contains('active')) + step];
+    const tabs = Array.from(document.querySelectorAll('.tab'));
+    const next = tabs[tabs.findIndex(tab => tab.classList.contains('on')) + step];
     if (next) next.click();
 }
 
-// В плитках стрелки вверх и вниз переходят в соседний ряд, на плитку в той же колонке.
-function gridNeighbor(items, current, step) {
-    const from = current.getBoundingClientRect();
-    const boxes = items.map(el => ({ el, box: el.getBoundingClientRect() }))
-        .filter(({ box }) => (step > 0 ? box.top > from.top + 1 : box.top < from.top - 1));
-    if (boxes.length === 0) return null;
-    const tops = boxes.map(({ box }) => box.top);
-    const rowTop = step > 0 ? Math.min(...tops) : Math.max(...tops);
-    return boxes.filter(({ box }) => Math.abs(box.top - rowTop) < 2)
-        .reduce((best, item) => (Math.abs(item.box.left - from.left) < Math.abs(best.box.left - from.left) ? item : best)).el;
-}
-
-// Раскрывает или сворачивает описание статьи, выбранной стрелками (в плитках оно видно всегда).
+// Раскрывает или сворачивает описание статьи, выбранной стрелками.
 function toggleSelectedDescription() {
     const el = articleElements().find(item => item.dataset.articleId === keyboardSelectedId);
     if (!el) return;
     closeSettingsPanel();
-    el.querySelector('.row-header').click();
-    setTimeout(() => revealInList(el, true), 280);
+    el.querySelector('.grid').click();
+    setTimeout(() => revealInList(el, true), 230);
 }
 
-searchField.title = '↑ ↓ — выбрать статью, Ctrl+C — скопировать номер, пробел — описание, ← → — кодекс';
 zoomMinusBtn.title = 'Уменьшить (←)';
 zoomPlusBtn.title = 'Увеличить (→)';
 
 // Щелчок по полю поиска снимает выбор статьи: стрелки влево и вправо снова двигают курсор по тексту.
 searchField.addEventListener('mousedown', () => {
     selectByKeyboard(null);
-    foundRowKeysActive = false;
 });
 
 // Ctrl+C копирует номер статьи, выбранной стрелками. Если выделен текст — в поле поиска или на странице —
@@ -1846,7 +1851,8 @@ document.addEventListener('keydown', (e) => {
     if (!article) return;
     e.preventDefault();
     closeSettingsPanel();
-    copyArticleNumber(article);
+    const selected = articleElements().find(item => item.dataset.articleId === keyboardSelectedId);
+    copyArticleNumber(article, { cell: selected ? selected.querySelector('.num') : null });
 });
 
 // Печать где угодно попадает в поиск: курсор переходит в поле, и набранный знак вводится уже в него.
@@ -1887,20 +1893,7 @@ document.addEventListener('keydown', (e) => {
         const caretAtEdge = step === 1
             ? searchField.selectionStart === searchField.value.length
             : searchField.selectionEnd === 0;
-        if (inSearch && !keyboardSelectedId && !foundRowKeysActive && !caretAtEdge) return;
-
-        // В плитках, когда плитка выбрана стрелками, влево и вправо переходят на соседнюю плитку.
-        // Пока выбора нет, они переключают вкладки и кодексы, как в списке.
-        if (currentView === 'grid' && currentCode !== 'pk') {
-            const items = articleElements();
-            const at = items.findIndex(item => item.dataset.articleId === keyboardSelectedId);
-            if (at !== -1) {
-                e.preventDefault();
-                releaseFocus();
-                selectByKeyboard(items[Math.min(Math.max(at + step, 0), items.length - 1)]);
-                return;
-            }
-        }
+        if (inSearch && !keyboardSelectedId && !caretAtEdge) return;
 
         // Без поиска — соседняя вкладка, при поиске — соседний кодекс в строке «Найдено».
         // Удержание клавиши не считается, чтобы не проскочить несколько вкладок подряд.
@@ -1920,7 +1913,7 @@ document.addEventListener('keydown', (e) => {
 
     // Пробел раскрывает описание, когда статья выбрана стрелками в списке; иначе это обычный пробел в запросе.
     if (e.key === ' ') {
-        if (!keyboardSelectedId || currentView !== 'list' || (!inSearch && e.target !== document.body)) return;
+        if (!keyboardSelectedId || (!inSearch && e.target !== document.body)) return;
         e.preventDefault();
         if (!e.repeat) toggleSelectedDescription();
         return;
@@ -1937,7 +1930,6 @@ document.addEventListener('keydown', (e) => {
     const current = items.find(item => item.dataset.articleId === keyboardSelectedId);
     let next;
     if (!current) next = step === 1 ? items[0] : null;
-    else if (currentView === 'grid') next = gridNeighbor(items, current, step);
     else next = items[items.indexOf(current) + step];
     // Вниз с последней статьи — выбор остаётся; вверх с первой — выбор снимается.
     if (!next && step === 1) next = current || null;
@@ -1945,8 +1937,19 @@ document.addEventListener('keydown', (e) => {
     if (!next) scrollToListTop();
 });
 
+// Ширина страницы изменилась: подпись в поле поиска — по раскладке; открытые настройки закрываются,
+// если их вид (панель или лист) перестал подходить.
+new ResizeObserver(() => {
+    syncSearchPlaceholder();
+    if (settingsPanel.classList.contains('open') && settingsPanel.classList.contains('sheet') !== isCardsLayout()) {
+        closeSettingsPanel();
+    }
+}).observe(document.querySelector('.app'));
+
+syncSearchPlaceholder();
 syncSearchClearBtn();
-searchField.focus();
+// На сенсорном экране курсор в поле не ставится: выехала бы клавиатура и закрыла экран.
+if (!touchQuery.matches) searchField.focus();
 showWelcomeToast();
 loadData();
 loadProceduralData();

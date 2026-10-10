@@ -2,134 +2,123 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=1360">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Законодательная база | Orlando</title>
     <link rel="icon" type="image/png" href="favicon.png">
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Стили и скрипт подключаются с меткой времени: браузер всегда берёт свежие файлы, а не сохранённую копию -->
     <script>document.write('<link rel="stylesheet" href="style.css?v=' + Date.now() + '">');</script>
 </head>
 <body>
 
-    <div class="controls-container">
-        <div class="search-wrapper">
-            <input type="text" id="searchInput" placeholder="Опишите ситуацию, введите фразу или номер..." autofocus>
-            <button class="search-clear" id="searchClearBtn" type="button" title="Очистить поиск (Esc)" aria-label="Очистить поиск">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 6L18 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
-                    <path d="M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
-                </svg>
-            </button>
-            <a class="forum-link" href="https://forum.majestic-rp.ru/forums/zakonodatel-naya-baza.1405/" target="_blank" rel="noopener" title="Перейти на форум с официальной законодательной базой" aria-label="Перейти на форум с официальной законодательной базой">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 18L18 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
-                    <path d="M8 6H18V16" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-            </a>
-        </div>
-        <div class="controls-row">
-            <div class="tabs">
-                <button class="tab-btn active" data-code="uk"><span class="tab-full">Уголовный кодекс</span><span class="tab-short">УК</span></button>
-                <button class="tab-btn" data-code="ak"><span class="tab-full">Административный кодекс</span><span class="tab-short">АК</span></button> 
-                <button class="tab-btn" data-code="dk"><span class="tab-full">Дорожный кодекс</span><span class="tab-short">ДК</span></button>
-                <button class="tab-btn" data-code="pk"><span class="tab-full">Общая информация</span><span class="tab-short">Инфо</span></button>
-            </div>
-            <div class="settings-wrapper">
-                <button class="settings-btn" id="settingsBtn" title="Настройки" aria-haspopup="true" aria-expanded="false">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z" fill="currentColor"/>
-                    </svg>
-                </button>
-                <div class="settings-panel" id="settingsPanel">
-                    <div class="settings-item">
-                        <span class="settings-item-label">Масштаб</span>
-                        <div class="zoom-control">
-                            <button class="zoom-step-btn" id="zoomMinusBtn" title="Уменьшить" aria-label="Уменьшить масштаб">−</button>
-                            <span class="zoom-value" id="zoomValue">100%</span>
-                            <button class="zoom-step-btn" id="zoomPlusBtn" title="Увеличить" aria-label="Увеличить масштаб">+</button>
+    <!-- Значки: рисуются через <use href="#i-..."> -->
+    <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M16 16L21 21"/></symbol>
+        <symbol id="i-forum" viewBox="0 0 24 24"><path d="M7 17L17 7"/><path d="M9 7H17V15"/></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6L18 18M18 6L6 18"/></symbol>
+        <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4V11L6 15V17H18V15L15 11V4M12 17V21M7 4H17"/></symbol>
+        <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9L12 15L18 9"/></symbol>
+        <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11"/><path d="M5 15H4V4H15V5"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12L10 17L19 7"/></symbol>
+        <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11L12 5L18 11"/></symbol>
+        <symbol id="i-set" viewBox="0 0 24 24"><path d="M4 7H20M4 12H20M4 17H20"/><path d="M8 5V9M15 10V14M10 15V19"/></symbol>
+    </svg>
+
+    <div class="app">
+        <div class="top">
+            <div class="wrap">
+                <div class="search">
+                    <div class="search-icon"><svg width="18" height="18"><use href="#i-search"/></svg></div>
+                    <input type="text" id="searchInput" placeholder="Опишите ситуацию, введите фразу или номер...">
+                    <div class="search-kbd"><kbd class="kbd">Esc</kbd></div>
+                    <button class="search-side search-clear" id="searchClearBtn" type="button" title="Очистить поиск (Esc)" aria-label="Очистить поиск"><svg width="16" height="16"><use href="#i-x"/></svg></button>
+                    <a class="search-side" href="https://forum.majestic-rp.ru/forums/zakonodatel-naya-baza.1405/" target="_blank" rel="noopener" title="Перейти на форум с официальной законодательной базой" aria-label="Перейти на форум с официальной законодательной базой"><svg width="18" height="18"><use href="#i-forum"/></svg></a>
+                </div>
+                <div class="bar">
+                    <div class="bar-left">
+                        <div class="tabs">
+                            <button class="tab on" data-code="uk"><span class="t-full">Уголовный кодекс</span><span class="t-short">УК</span></button>
+                            <button class="tab" data-code="ak"><span class="t-full">Административный кодекс</span><span class="t-short">АК</span></button>
+                            <button class="tab" data-code="dk"><span class="t-full">Дорожный кодекс</span><span class="t-short">ДК</span></button>
+                            <button class="tab" data-code="pk"><span class="t-full">Общая информация</span><span class="t-short">Инфо</span></button>
                         </div>
+                        <div class="keys tab-keys"><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd></div>
                     </div>
-                    <div class="settings-divider"></div>
-                    <div class="settings-item">
-                        <span class="settings-item-label">Отображение статей</span>
-                        <div class="mode-toggle" role="group" aria-label="Переключение режима отображения статей">
-                            <button class="mode-btn active" data-mode="compact" title="Основные статьи" aria-pressed="true">
-                                <svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M3 1H11L15 5V17H3V1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                                    <path d="M11 1V5H15" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                                    <line x1="5" y1="9" x2="12" y2="9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                                    <line x1="5" y1="12" x2="12" y2="12" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                                    <line x1="5" y1="14" x2="9" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                                </svg>
-                            </button>
-                            <button class="mode-btn" data-mode="full" title="Все статьи" aria-pressed="false">
-                                <svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M1 17H17V5H8L6 2H1V17Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                                </svg>
-                            </button>
+                    <div class="settings-wrapper">
+                        <button class="icon-btn" id="settingsBtn" type="button" title="Настройки" aria-label="Настройки" aria-haspopup="true" aria-expanded="false"><svg width="18" height="18"><use href="#i-set"/></svg></button>
+                        <div class="panel" id="settingsPanel">
+                            <div class="panel-head">
+                                <span class="label">Настройки</span>
+                                <button id="settingsCloseBtn" type="button" title="Закрыть" aria-label="Закрыть настройки"><svg width="16" height="16"><use href="#i-x"/></svg></button>
+                            </div>
+                            <div class="setting no-touch">
+                                <span>Масштаб</span>
+                                <div class="zoom">
+                                    <button id="zoomMinusBtn" type="button" title="Уменьшить" aria-label="Уменьшить масштаб">−</button>
+                                    <span id="zoomValue">100%</span>
+                                    <button id="zoomPlusBtn" type="button" title="Увеличить" aria-label="Увеличить масштаб">+</button>
+                                </div>
+                            </div>
+                            <div class="setting">
+                                <span>Статьи</span>
+                                <div class="seg" role="group" aria-label="Переключение режима отображения статей">
+                                    <button class="mode-btn on" type="button" data-mode="compact" title="Основные статьи" aria-pressed="true">Основные</button>
+                                    <button class="mode-btn" type="button" data-mode="full" title="Все статьи" aria-pressed="false">Все</button>
+                                </div>
+                            </div>
+                            <div class="setting no-touch">
+                                <span>Подсказки клавиш</span>
+                                <div class="seg" role="group" aria-label="Подсказки клавиш">
+                                    <button class="hints-btn on" type="button" data-hints="on" aria-pressed="true">Показывать</button>
+                                    <button class="hints-btn" type="button" data-hints="off" aria-pressed="false">Скрыть</button>
+                                </div>
+                            </div>
+                            <div class="panel-keys no-touch">
+                                <span class="label">Клавиши</span>
+                                <div class="keyrow"><span>Выбрать статью</span><span class="keys"><kbd class="kbd">↑</kbd><kbd class="kbd">↓</kbd></span></div>
+                                <div class="keyrow"><span>Скопировать номер</span><span class="keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">C</kbd></span></div>
+                                <div class="keyrow"><span>Раскрыть описание</span><span class="keys"><kbd class="kbd">Пробел</kbd></span></div>
+                                <div class="keyrow"><span>Кодекс или вкладка</span><span class="keys"><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd></span></div>
+                                <div class="keyrow"><span>Очистить поиск</span><span class="keys"><kbd class="kbd">Esc</kbd></span></div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="settings-item">
-                        <span class="settings-item-label">Вид отображения</span>
-                        <div class="view-toggle" role="group" aria-label="Переключение вида отображения">
-                            <button class="view-btn active" data-view="list" title="Список" aria-pressed="true">
-                                <svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <rect x="1" y="2" width="16" height="3.5" rx="1.2" fill="currentColor"/>
-                                    <rect x="1" y="7.25" width="16" height="3.5" rx="1.2" fill="currentColor"/>
-                                    <rect x="1" y="12.5" width="16" height="3.5" rx="1.2" fill="currentColor"/>
-                                </svg>
-                            </button>
-                            <button class="view-btn" data-view="grid" title="Плитки" aria-pressed="false">
-                                <svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <rect x="1" y="1" width="7" height="7" rx="1.5" fill="currentColor"/>
-                                    <rect x="10" y="1" width="7" height="7" rx="1.5" fill="currentColor"/>
-                                    <rect x="1" y="10" width="7" height="7" rx="1.5" fill="currentColor"/>
-                                    <rect x="10" y="10" width="7" height="7" rx="1.5" fill="currentColor"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="settings-divider"></div>
-                    <div class="settings-keys">
-                        <div class="settings-keys-title">Клавиши</div>
-                        <div class="settings-key-row"><span>Выбрать статью</span><span class="settings-key-caps"><kbd>↑</kbd><kbd>↓</kbd></span></div>
-                        <div class="settings-key-row"><span>Скопировать номер</span><span class="settings-key-caps"><kbd>Ctrl</kbd><kbd>C</kbd></span></div>
-                        <div class="settings-key-row"><span>Раскрыть описание</span><span class="settings-key-caps"><kbd>Пробел</kbd></span></div>
-                        <div class="settings-key-row"><span>Кодекс или вкладка</span><span class="settings-key-caps"><kbd>←</kbd><kbd>→</kbd></span></div>
-                        <div class="settings-key-row"><span>Очистить поиск</span><span class="settings-key-caps"><kbd>Esc</kbd></span></div>
                     </div>
                 </div>
+                <div class="found" id="foundRow"></div>
+                <div class="recent" id="recentRow"></div>
             </div>
+        </div>
+
+        <div class="wrap">
+            <div id="articlesContainer"><div class="state-box"><div class="pulse"><i></i><i></i><i></i></div>Синхронизация данных...</div></div>
+
+            <footer class="footer">
+                <a class="btn" href="https://www.donationalerts.com/r/rezotoridze" target="_blank" rel="noopener">Донат</a>
+                <a class="btn" href="https://discordapp.com/users/1016726999420653709" target="_blank" rel="noopener">Discord</a>
+                <span>Проект от Rezo Toridze</span>
+                <span class="sp"></span>
+                <span class="footer-meta-date"></span>
+            </footer>
         </div>
     </div>
 
-    <div id="articlesContainer"><div class="loader">Синхронизация данных...</div></div>
+    <button class="to-top" id="scrollTopBtn" type="button" title="Наверх" aria-label="Прокрутить наверх"><svg width="18" height="18"><use href="#i-up"/></svg></button>
 
-    <button class="scroll-top-btn" id="scrollTopBtn" title="Наверх" aria-label="Прокрутить наверх">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 19V5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-            <path d="M6 11L12 5L18 11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-    </button>
-
-    <footer class="site-footer">
-        <div class="footer-links">
-            <a class="footer-btn" href="https://www.donationalerts.com/r/rezotoridze" target="_blank" rel="noopener">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 20.5C12 20.5 3 15.5 3 9.4C3 6.4 5.3 4.5 7.8 4.5C9.6 4.5 11.1 5.5 12 7C12.9 5.5 14.4 4.5 16.2 4.5C18.7 4.5 21 6.4 21 9.4C21 15.5 12 20.5 12 20.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-                </svg>
-                Донат
-            </a>
-            <a class="footer-btn" href="https://discordapp.com/users/1016726999420653709" target="_blank" rel="noopener">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M4 20V6C4 4.9 4.9 4 6 4H18C19.1 4 20 4.9 20 6V15C20 16.1 19.1 17 18 17H8L4 20Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-                </svg>
-                Discord
-            </a>
+    <!-- Полоса подсказок: клавиши по обстановке -->
+    <div class="keybar">
+        <div class="wrap">
+            <div class="item when-none no-info"><span class="keys"><kbd class="kbd">↑</kbd><kbd class="kbd">↓</kbd></span>Выбрать статью</div>
+            <div class="item when-none"><span class="keys"><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd></span>Сменить кодекс</div>
+            <div class="item when-none no-info"><span class="keys"><kbd class="kbd">ЛКМ</kbd></span>по номеру — скопировать</div>
+            <div class="item when-none quiet">Начните печатать — откроется поиск</div>
+            <div class="item when-sel"><span class="keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">C</kbd></span>Скопировать номер</div>
+            <div class="item when-sel"><span class="keys"><kbd class="kbd">Пробел</kbd></span>Описание</div>
+            <div class="item when-sel"><span class="keys"><kbd class="kbd">↑</kbd><kbd class="kbd">↓</kbd></span>Другая статья</div>
+            <div class="item when-sel"><span class="keys"><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd></span>Сменить кодекс</div>
+            <div class="item when-sel"><span class="keys"><kbd class="kbd">Esc</kbd></span>Снять выбор</div>
         </div>
-        <div class="footer-signature">Проект от Rezo Toridze</div>
-        <div class="footer-meta-date"></div>
-    </footer>
+    </div>
 
     <script>document.write('<script src="script.js?v=' + Date.now() + '"><\/script>');</script>
 </body>
