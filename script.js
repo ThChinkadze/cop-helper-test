@@ -107,12 +107,12 @@ function rememberCopied(article) {
     renderRecentRow();
 }
 
-// Строка «Недавно скопированные» в шапке, под вкладками; при поиске и на «Общей информации» её нет.
+// Строка «Недавно скопированные» в шапке, под вкладками; при поиске, на «Общей информации» и на сенсорном экране её нет.
 // Нажатие на номер копирует его снова, порядок в строке при этом не меняется.
 function renderRecentRow() {
     const row = document.getElementById('recentRow');
     row.innerHTML = '';
-    if (currentCode === 'pk' || articlesLoadState !== 'ready' || listShowsSearch) return;
+    if (currentCode === 'pk' || articlesLoadState !== 'ready' || listShowsSearch || touchQuery.matches) return;
 
     const articles = recentCopied
         .map(id => parsedDatabase.find(article => articleId(article) === id))
@@ -1051,8 +1051,10 @@ function buildPinButton(article) {
 
 // Обработчики строки: копирование номера, пин.
 // stopPropagation нужен, потому что строка целиком кликабельна (раскрытие описания).
+// На сенсорном экране номер не копируется: нажатие на него раскрывает описание, как и на остальную строку.
 function attachArticleHandlers(row, article) {
     row.querySelector('.num').addEventListener('click', (e) => {
+        if (touchQuery.matches) return;
         e.stopPropagation();
         copyArticleNumber(article, { cell: e.currentTarget });
     });
@@ -1682,14 +1684,17 @@ applyZoom();
 updateZoomUI();
 
 // ===== Сенсорный экран =====
-// Подсказки клавиш и масштаб на нём не действуют.
+// Подсказки клавиш, масштаб и копирование номера на нём не действуют.
 function syncTouchMode() {
     document.body.classList.toggle('touch', touchQuery.matches);
     syncKeyHintsUI();
     applyZoom();
 }
 
-touchQuery.addEventListener('change', syncTouchMode);
+touchQuery.addEventListener('change', () => {
+    syncTouchMode();
+    renderRecentRow();
+});
 syncTouchMode();
 
 // ===== Панель настроек (шестерёнка) =====
