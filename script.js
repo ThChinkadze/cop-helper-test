@@ -1,3 +1,21 @@
+// ===== Версия страницы =====
+// Браузер может несколько минут держать в памяти старый index.html, а этот файл всегда берётся свежим.
+// Если страница старее, чем нужна скрипту, она один раз запрашивается заново в обход сохранённой копии.
+// При правке разметки, от которой зависит скрипт, число увеличивается здесь и в data-page у <html>.
+const PAGE_VERSION = '2';
+const FRESH_PAGE_RE = /[?&]fresh=/;
+
+if (document.documentElement.dataset.page !== PAGE_VERSION) {
+    if (!FRESH_PAGE_RE.test(location.search)) {
+        location.replace(`${location.pathname}?fresh=${Date.now()}`);
+    } else {
+        const box = document.getElementById('articlesContainer');
+        if (box) box.textContent = 'Сайт обновляется. Обновите страницу через минуту.';
+    }
+    throw new Error('Страница старее скрипта');
+}
+if (FRESH_PAGE_RE.test(location.search)) history.replaceState(null, '', location.pathname);
+
 // ===== Настройки сервера =====
 const SHEET_ID = '1y4PKeW4sTxnQhJJ7nlO2coCZPdRbUKjC28KQkpMidrs';
 const STORAGE_PREFIX = 'majestic_orlando_';
@@ -232,7 +250,8 @@ function updateStaleBanner() {
     banner.id = 'staleDataBanner';
     banner.className = 'stale';
     banner.innerHTML = `
-        <span>Не удалось обновить данные. Показана последняя сохранённая версия от ${dateStr}.</span>
+        <span class="st-full">Не удалось обновить данные. Показана последняя сохранённая версия от ${dateStr}.</span>
+        <span class="st-short" title="Показана последняя сохранённая версия от ${dateStr}">Данные не обновились</span>
         <button id="retryStaleBtn" class="btn" type="button">Обновить</button>
     `;
     document.querySelector('.top .wrap').appendChild(banner);
@@ -1146,6 +1165,13 @@ function renderFoundRow(counts) {
             renderArticles();
         });
     });
+    syncSwitchHint();
+}
+
+// Подсказка «← → Сменить кодекс» скрыта, когда стрелкам нечего переключать: идёт поиск, а строки «Найдено» нет.
+function syncSwitchHint() {
+    const searching = document.getElementById('searchInput').value !== '';
+    document.body.classList.toggle('no-switch', searching && !document.querySelector('#foundRow .chip'));
 }
 
 function renderArticles({ keepExpanded = false } = {}) {
@@ -1159,6 +1185,7 @@ function renderArticles({ keepExpanded = false } = {}) {
 
     document.getElementById('foundRow').innerHTML = '';
     document.getElementById('recentRow').innerHTML = '';
+    syncSwitchHint();
 
     const tabs = document.querySelector('.tabs');
     tabs.classList.remove('searching');
@@ -1640,6 +1667,7 @@ function setZoom(newZoom) {
     applyZoom();
     updateZoomUI();
     localStorage.setItem(ZOOM_KEY, String(currentZoom));
+    fitSettingsPanel();
 }
 
 zoomMinusBtn.addEventListener('click', () => {
@@ -1690,13 +1718,30 @@ function placeSettingsPanel() {
     (asSheet ? document.body : settingsWrapper).appendChild(settingsPanel);
 }
 
+// Панель не выходит за нижний край окна: если она выше свободного места, её содержимое прокручивается.
+function fitSettingsPanel() {
+    settingsPanel.classList.remove('tight');
+    settingsPanel.style.maxHeight = '';
+    if (!settingsPanel.classList.contains('open')) return;
+    const zoom = touchQuery.matches ? 1 : currentZoom / 100;
+    const top = settingsPanel.classList.contains('sheet') ? 12 : settingsPanel.getBoundingClientRect().top;
+    const room = Math.floor((window.innerHeight - top - 12) / zoom);
+    if (settingsPanel.offsetHeight > room) {
+        settingsPanel.classList.add('tight');
+        settingsPanel.style.maxHeight = `${Math.max(140, room)}px`;
+    }
+}
+
 function toggleSettingsPanel() {
     const willOpen = !settingsPanel.classList.contains('open');
     if (willOpen) placeSettingsPanel();
     settingsPanel.classList.toggle('open', willOpen);
     settingsBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    fitSettingsPanel();
     syncSheetHeight();
 }
+
+window.addEventListener('resize', fitSettingsPanel);
 
 settingsBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1758,6 +1803,7 @@ const searchClearBtn = document.getElementById('searchClearBtn');
 // Пока в поле есть текст, видны крестик и значок Esc, а стрелки у вкладок скрыты.
 function syncSearchClearBtn() {
     document.body.classList.toggle('has-query', searchField.value !== '');
+    syncSwitchHint();
 }
 
 function clearSearch() {
