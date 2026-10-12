@@ -1046,6 +1046,16 @@ svg {
 /* Окно ниже панели: её содержимое прокручивается (высоту задаёт скрипт) */
 .panel.tight { overflow-y: auto; }
 
+/* Уголки-метки уезжали бы вместе с содержимым, поэтому здесь они нарисованы самой рамкой; цвета те же — --l3 и --accent-text */
+.panel.tight:not(.sheet) {
+    border-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30'%3E%3Crect x='.5' y='.5' width='29' height='29' fill='none' stroke='%23fff' stroke-opacity='.22'/%3E%3Cpath d='M.5 11V.5H11M29.5 19V29.5H19' fill='none' stroke='%236aa8f5'/%3E%3C/svg%3E") 11 / 11px;
+}
+
+.panel.tight::before,
+.panel.tight::after {
+    display: none;
+}
+
 .panel::before,
 .panel::after {
     content: "";
@@ -1288,6 +1298,7 @@ svg {
     z-index: 6;
     background: var(--s1);
     border-top: 1px solid var(--l3);
+    container: keybar / inline-size;
 }
 
 .keys-on .keybar { display: block; }
@@ -1665,33 +1676,41 @@ body:not(.keys-on) .search-kbd {
     .footer .sp { display: none; }
 }
 
-/* Полоса подсказок и кнопка «наверх» лежат вне .app — для них считается ширина окна */
-@media (max-width: 999px) {
+/* Полоса подсказок лежит вне .app: её правила привязаны к её собственной ширине — так учитывается масштаб из настроек */
+@container keybar (max-width: 999px) {
     .keybar .quiet { display: none; }
 }
 
 /* Чем уже окно, тем меньше подсказок в полосе: остаются главные, ни одна не обрезается */
-@media (max-width: 929px) {
+@container keybar (max-width: 929px) {
     .keybar .k-other { display: none; }
 }
 
-@media (max-width: 794px) {
+@container keybar (max-width: 794px) {
     .is-pointing .keybar .k-pick { display: none; }
 }
 
-@media (max-width: 754px) {
+@container keybar (max-width: 754px) {
     .is-selected .keybar .k-switch,
     .is-pointing .keybar .k-switch {
         display: none;
     }
 }
 
-@media (max-width: 649px) {
+@container keybar (max-width: 649px) {
     .keybar .k-click { display: none; }
 }
 
-@media (max-width: 559px) {
+@container keybar (max-width: 559px) {
     .keybar .k-esc { display: none; }
+}
+
+/* Самое узкое окно: остаётся одна подсказка */
+@container keybar (max-width: 389px) {
+    .keybar .k-space,
+    body:not(.is-selected):not(.is-pointing):not(.on-info) .keybar .k-switch {
+        display: none;
+    }
 }
 
 @media (max-width: 639px) {

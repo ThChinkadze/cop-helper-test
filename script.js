@@ -20,10 +20,42 @@ if (FRESH_PAGE_RE.test(location.search)) history.replaceState(null, '', location
 const SHEET_ID = '1y4PKeW4sTxnQhJJ7nlO2coCZPdRbUKjC28KQkpMidrs';
 const STORAGE_PREFIX = 'majestic_orlando_';
 
+// ===== Память браузера =====
+// При строгих настройках приватности браузер запрещает хранение, и обращение к localStorage бросает ошибку.
+// Тогда сайт работает без сохранения: настройки и копия базы живут до закрытия вкладки.
+function storeGet(key) {
+    try {
+        return localStorage.getItem(key);
+    } catch {
+        return null;
+    }
+}
+
+function storeSet(key, value) {
+    try {
+        localStorage.setItem(key, value);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function storeRemove(key) {
+    try {
+        localStorage.removeItem(key);
+    } catch {
+        // Хранение запрещено — убирать нечего.
+    }
+}
+
 // Уборка за прежней версией сайта (сервер Portland): её сохранённые данные больше не читаются.
-Object.keys(localStorage)
-    .filter(key => key.startsWith('majestic_portland_'))
-    .forEach(key => localStorage.removeItem(key));
+try {
+    Object.keys(localStorage)
+        .filter(key => key.startsWith('majestic_portland_'))
+        .forEach(key => localStorage.removeItem(key));
+} catch {
+    // Хранение запрещено — убирать нечего.
+}
 
 // ===== Настройки Google Sheets =====
 function sheetUrl(sheetName) {
@@ -51,13 +83,13 @@ let listShowsSearch = false;
 
 // ===== Режим отображения (compact/full) =====
 const DISPLAY_MODE_KEY = STORAGE_PREFIX + 'display_mode';
-let currentDisplayMode = localStorage.getItem(DISPLAY_MODE_KEY) === 'full' ? 'full' : 'compact';
+let currentDisplayMode = storeGet(DISPLAY_MODE_KEY) === 'full' ? 'full' : 'compact';
 
 const ZOOM_KEY = STORAGE_PREFIX + 'zoom_level';
 const ZOOM_MIN = 75;
 const ZOOM_MAX = 130;
 const ZOOM_STEP = 5;
-const storedZoom = parseInt(localStorage.getItem(ZOOM_KEY), 10);
+const storedZoom = parseInt(storeGet(ZOOM_KEY), 10);
 let currentZoom = (Number.isInteger(storedZoom) && storedZoom >= ZOOM_MIN && storedZoom <= ZOOM_MAX && storedZoom % ZOOM_STEP === 0)
     ? storedZoom
     : 100;
@@ -75,7 +107,7 @@ let pinnedArticles = new Set(loadPinnedArticles());
 
 function loadPinnedArticles() {
     try {
-        const raw = JSON.parse(localStorage.getItem(PINNED_KEY));
+        const raw = JSON.parse(storeGet(PINNED_KEY));
         return Array.isArray(raw) ? raw : [];
     } catch {
         return [];
@@ -93,7 +125,7 @@ let recentCopied = loadRecentCopied();
 
 function loadRecentCopied() {
     try {
-        const raw = JSON.parse(localStorage.getItem(RECENT_KEY));
+        const raw = JSON.parse(storeGet(RECENT_KEY));
         return Array.isArray(raw) ? raw.filter(id => typeof id === 'string').slice(0, RECENT_LIMIT) : [];
     } catch {
         return [];
@@ -103,7 +135,7 @@ function loadRecentCopied() {
 function rememberCopied(article) {
     const id = articleId(article);
     recentCopied = [id, ...recentCopied.filter(other => other !== id)].slice(0, RECENT_LIMIT);
-    localStorage.setItem(RECENT_KEY, JSON.stringify(recentCopied));
+    storeSet(RECENT_KEY, JSON.stringify(recentCopied));
     renderRecentRow();
 }
 
@@ -146,7 +178,7 @@ function renderRecentRow() {
 // Кнопка с крестиком в конце строки: список недавних очищается целиком.
 function clearRecentCopied() {
     recentCopied = [];
-    localStorage.removeItem(RECENT_KEY);
+    storeRemove(RECENT_KEY);
     renderRecentRow();
     showToast('Недавние очищены');
 }
@@ -162,7 +194,7 @@ function togglePinned(article) {
     } else {
         pinnedArticles.add(id);
     }
-    localStorage.setItem(PINNED_KEY, JSON.stringify([...pinnedArticles]));
+    storeSet(PINNED_KEY, JSON.stringify([...pinnedArticles]));
     renderArticles({ keepExpanded: true });
 }
 
@@ -180,6 +212,13 @@ const CODE_LABELS = {
 
 // Код кодекса из таблицы (UK/AK/DK) -> внутренний нижний регистр
 const CODE_MAP = {'UK':'uk','AK':'ak','DK':'dk'};
+
+// Код, набранный русскими буквами (УК, АК, ДК), читается так же: иначе строка молча пропала бы из списка.
+const CODE_CYRILLIC = { 'У': 'U', 'А': 'A', 'Д': 'D', 'К': 'K' };
+
+function readCode(raw) {
+    return CODE_MAP[raw.toUpperCase().replace(/[УАДК]/g, ch => CODE_CYRILLIC[ch])];
+}
 
 const TYPE_LABELS = {
     'Ф': 'Федеральная',
@@ -211,16 +250,14 @@ const CACHE_KEY = STORAGE_PREFIX + 'pravovaya_baza_cache_v1';
 const PK_CACHE_KEY = STORAGE_PREFIX + 'pk_cache_v1';
 
 function saveCache(key, data) {
-    try {
-        localStorage.setItem(key, JSON.stringify({ data, savedAt: Date.now() }));
-    } catch (e) {
-        console.warn('Не удалось сохранить локальный кэш данных', e);
+    if (!storeSet(key, JSON.stringify({ data, savedAt: Date.now() }))) {
+        console.warn('Не удалось сохранить локальный кэш данных');
     }
 }
 
 function loadCache(key) {
     try {
-        const raw = localStorage.getItem(key);
+        const raw = storeGet(key);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         if (!parsed || !Array.isArray(parsed.data)) return null;
@@ -353,7 +390,7 @@ const PK_KNOWN_TYPES = ['steps', 'list', 'text'];
 
 function looksLikeArticlesSheet(rows) {
     const filled = rows.filter(row => row.c && getCellVal(row.c, 0) !== '');
-    const withCode = filled.filter(row => CODE_MAP[getCellVal(row.c, COL.CODE).toUpperCase()]);
+    const withCode = filled.filter(row => readCode(getCellVal(row.c, COL.CODE)));
     return withCode.length > 0 && withCode.length >= filled.length / 2;
 }
 
@@ -368,11 +405,11 @@ function parseArticleRows(rows) {
         const cells = row.c;
         const getVal = (idx) => getCellVal(cells, idx);
 
-        let rawCode = getVal(COL.CODE).toUpperCase();
-        if (rawCode === "КОДЕКС" || !CODE_MAP[rawCode]) return;
+        const code = readCode(getVal(COL.CODE));
+        if (!code) return;
 
         articles.push({
-            code: CODE_MAP[rawCode],
+            code,
             num: getVal(COL.NUM),
             title: getVal(COL.TITLE) || (getVal(COL.DESC).split(/[.\n]/)[0].trim() + '.'),
             desc: getVal(COL.DESC) || getVal(COL.TITLE),
@@ -390,7 +427,8 @@ function parseArticleRows(rows) {
 }
 
 // Сохранённая копия показывается сразу, свежие данные подменяют её после загрузки.
-async function loadData() {
+// quiet — обновление в фоне на открытой странице: его неудача не показывается.
+async function loadData({ quiet = false } = {}) {
     const cached = loadCache(CACHE_KEY);
     if (cached && articlesLoadState !== 'ready') {
         parsedDatabase = cached.data;
@@ -407,15 +445,17 @@ async function loadData() {
         saveCache(CACHE_KEY, fresh);
         const changed = articlesLoadState !== 'ready' || JSON.stringify(fresh) !== JSON.stringify(parsedDatabase);
         if (changed) {
+            // Список уже на экране: выбор стрелками и раскрытые строки остаются на месте.
+            const onScreen = articlesLoadState === 'ready';
             parsedDatabase = fresh;
             articlesLoadState = 'ready';
-            renderArticles();
+            renderArticles({ keepExpanded: onScreen });
         }
         markFresh('articles');
     } catch (e) {
         console.error(e);
         if (articlesLoadState === 'ready') {
-            markStale('articles', cached ? cached.savedAt : Date.now());
+            if (!quiet) markStale('articles', cached ? cached.savedAt : Date.now());
         } else {
             articlesLoadState = 'error';
             renderArticles();
@@ -445,7 +485,7 @@ function parseProceduralRows(rows) {
 }
 
 // Отдельный лист, отдельная упрощённая структура полей — не смешивается с parsedDatabase.
-async function loadProceduralData() {
+async function loadProceduralData({ quiet = false } = {}) {
     const cached = loadCache(PK_CACHE_KEY);
     if (cached && proceduralLoadState !== 'ready') {
         proceduralData = cached.data;
@@ -474,7 +514,7 @@ async function loadProceduralData() {
     } catch (e) {
         console.error('Не удалось загрузить данные раздела "Общая информация":', e);
         if (proceduralLoadState === 'ready') {
-            markStale('procedural', cached ? cached.savedAt : Date.now());
+            if (!quiet) markStale('procedural', cached ? cached.savedAt : Date.now());
         } else {
             proceduralLoadState = 'error';
             if (currentCode === 'pk') renderArticles();
@@ -497,7 +537,7 @@ function showDbDate(dbDate) {
 
 // Лист "Последняя редакция": A1 — заголовок, A2 — дата (вписывается вручную).
 async function loadMetaData() {
-    const seenDate = localStorage.getItem(DB_DATE_SEEN_KEY);
+    const seenDate = storeGet(DB_DATE_SEEN_KEY);
     if (seenDate) showDbDate(seenDate);
 
     try {
@@ -518,11 +558,13 @@ async function loadMetaData() {
 }
 
 // Тост при первом заходе на сайт и при смене даты.
+let notifiedDbDate = null;
 function notifyDbDate(dbDate) {
     showDbDate(dbDate);
 
-    if (localStorage.getItem(DB_DATE_SEEN_KEY) === dbDate) return;
-    localStorage.setItem(DB_DATE_SEEN_KEY, dbDate);
+    if (storeGet(DB_DATE_SEEN_KEY) === dbDate || notifiedDbDate === dbDate) return;
+    notifiedDbDate = dbDate;
+    storeSet(DB_DATE_SEEN_KEY, dbDate);
     // Ждёт, пока скроется приветствие, — иначе заменит его на полуслове.
     setTimeout(() => showToast(`Последняя редакция: ${dbDate}`), Math.max(0, welcomeToastUntil - Date.now()));
 }
@@ -1076,6 +1118,7 @@ function showToast(message, duration = TOAST_DURATION_MS, strong = '') {
     if (!toastEl) {
         toastEl = document.createElement('div');
         toastEl.className = 'toast';
+        toastEl.setAttribute('role', 'status');
         document.body.appendChild(toastEl);
     }
     toastEl.textContent = message;
@@ -1236,8 +1279,15 @@ function renderArticles({ keepExpanded = false } = {}) {
     }
 
     const expandedIds = new Set();
+    // Части, вставленные под строку нажатием на плашку: после перерисовки возвращаются под ту же строку.
+    const insertedParts = [];
     if (keepExpanded) {
         container.querySelectorAll('.row.open').forEach(row => expandedIds.add(row.dataset.articleId));
+        container.querySelectorAll('.row[data-inserted="true"]').forEach(row => {
+            let anchor = row.previousElementSibling;
+            while (anchor && anchor.dataset.inserted === 'true') anchor = anchor.previousElementSibling;
+            if (anchor) insertedParts.push({ id: row.dataset.articleId, anchorId: anchor.dataset.articleId });
+        });
     }
 
     container.innerHTML = "";
@@ -1252,6 +1302,12 @@ function renderArticles({ keepExpanded = false } = {}) {
     }
 
     renderAsList(container, matchedArticles, query, expandedIds);
+    insertedParts.forEach(({ id, anchorId }) => {
+        const rows = articleElements();
+        if (rows.some(row => row.dataset.articleId === id)) return;
+        const anchor = rows.find(row => row.dataset.articleId === anchorId);
+        if (anchor) insertArticlePart(anchor, id, query, expandedIds.has(id));
+    });
     restoreKeyboardSelection();
     renderRecentRow();
     if (query) renderFoundRow(counts);
@@ -1361,23 +1417,30 @@ function revealInList(el, smooth = false) {
     el.scrollIntoView({ block: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
 }
 
+// Строка части, которой нет в списке, вставляется под исходной строкой.
+function insertArticlePart(fromRow, id, query, isExpanded = false) {
+    const article = parsedDatabase.find(item => articleId(item) === id);
+    if (!article) return null;
+    const target = buildListRow(article, query, isExpanded);
+    target.dataset.inserted = 'true';
+    // Вставленные части идут под исходной строкой в порядке номеров.
+    const order = el => parsedDatabase.findIndex(item => articleId(item) === el.dataset.articleId);
+    let anchor = fromRow;
+    while (anchor.nextElementSibling && anchor.nextElementSibling.dataset.inserted === 'true'
+        && order(anchor.nextElementSibling) < order(target)) {
+        anchor = anchor.nextElementSibling;
+    }
+    anchor.after(target);
+    return target;
+}
+
 // Нажатие на плашку части: её строка раскрывается; если строки нет в списке — вставляется под текущей.
 function openArticlePart(fromRow, id, query) {
     const rows = Array.from(fromRow.parentElement.querySelectorAll('.row'));
     let target = rows.find(item => item.dataset.articleId === id);
     if (!target) {
-        const article = parsedDatabase.find(item => articleId(item) === id);
-        if (!article) return;
-        target = buildListRow(article, query, false);
-        target.dataset.inserted = 'true';
-        // Вставленные части идут под исходной строкой в порядке номеров.
-        const order = el => parsedDatabase.findIndex(item => articleId(item) === el.dataset.articleId);
-        let anchor = fromRow;
-        while (anchor.nextElementSibling && anchor.nextElementSibling.dataset.inserted === 'true'
-            && order(anchor.nextElementSibling) < order(target)) {
-            anchor = anchor.nextElementSibling;
-        }
-        anchor.after(target);
+        target = insertArticlePart(fromRow, id, query);
+        if (!target) return;
         void target.offsetWidth; // чтобы раскрытие вставленной строки было плавным
     }
     target.classList.add('open');
@@ -1564,10 +1627,17 @@ function isCardsLayout() {
 const SEARCH_PLACEHOLDER_DEFAULT = document.getElementById('searchInput').placeholder;
 const SEARCH_PLACEHOLDER_SHORT = 'Ситуация, слово или номер...';
 const SEARCH_PLACEHOLDER_PK = 'Поиск по общей информации...';
+// Самый узкий экран (до 359 px): подписи ещё короче, иначе они обрезаются.
+const SEARCH_PLACEHOLDER_TINY = 'Ситуация или номер...';
+const SEARCH_PLACEHOLDER_PK_TINY = 'Поиск по информации...';
 
 function syncSearchPlaceholder() {
+    const tiny = document.querySelector('.app').clientWidth <= 359;
     const narrow = isCardsLayout() ? SEARCH_PLACEHOLDER_SHORT : SEARCH_PLACEHOLDER_DEFAULT;
-    document.getElementById('searchInput').placeholder = currentCode === 'pk' ? SEARCH_PLACEHOLDER_PK : narrow;
+    const text = currentCode === 'pk'
+        ? (tiny ? SEARCH_PLACEHOLDER_PK_TINY : SEARCH_PLACEHOLDER_PK)
+        : (tiny ? SEARCH_PLACEHOLDER_TINY : narrow);
+    document.getElementById('searchInput').placeholder = text;
 }
 
 document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', (e) => {
@@ -1613,7 +1683,7 @@ const DISPLAY_MODE_TOAST = {
 function setDisplayMode(selectedMode) {
     if (selectedMode === currentDisplayMode) return;
     currentDisplayMode = selectedMode;
-    localStorage.setItem(DISPLAY_MODE_KEY, currentDisplayMode);
+    storeSet(DISPLAY_MODE_KEY, currentDisplayMode);
     syncModeToggleUI();
     renderArticles();
     swapInList();
@@ -1628,7 +1698,7 @@ syncModeToggleUI();
 
 // ===== Подсказки клавиш: полоса внизу и значки клавиш =====
 const KEY_HINTS_KEY = STORAGE_PREFIX + 'key_hints';
-let keyHintsOn = localStorage.getItem(KEY_HINTS_KEY) !== 'off';
+let keyHintsOn = storeGet(KEY_HINTS_KEY) !== 'off';
 
 function syncKeyHintsUI() {
     document.body.classList.toggle('keys-on', keyHintsOn && !touchQuery.matches);
@@ -1641,7 +1711,7 @@ function syncKeyHintsUI() {
 
 document.querySelectorAll('.hints-btn').forEach(btn => btn.addEventListener('click', (e) => {
     keyHintsOn = e.currentTarget.getAttribute('data-hints') === 'on';
-    localStorage.setItem(KEY_HINTS_KEY, keyHintsOn ? 'on' : 'off');
+    storeSet(KEY_HINTS_KEY, keyHintsOn ? 'on' : 'off');
     syncKeyHintsUI();
 }));
 
@@ -1668,7 +1738,7 @@ function setZoom(newZoom) {
     currentZoom = newZoom;
     applyZoom();
     updateZoomUI();
-    localStorage.setItem(ZOOM_KEY, String(currentZoom));
+    storeSet(ZOOM_KEY, String(currentZoom));
     fitSettingsPanel();
 }
 
@@ -1723,14 +1793,17 @@ function placeSettingsPanel() {
     (asSheet ? document.body : settingsWrapper).appendChild(settingsPanel);
 }
 
-// Панель не выходит за нижний край окна: если она выше свободного места, её содержимое прокручивается.
+// Панель не выходит за нижний край окна и не уходит под полосу подсказок клавиш:
+// если она выше свободного места, её содержимое прокручивается.
 function fitSettingsPanel() {
     settingsPanel.classList.remove('tight');
     settingsPanel.style.maxHeight = '';
     if (!settingsPanel.classList.contains('open')) return;
     const zoom = touchQuery.matches ? 1 : currentZoom / 100;
     const top = settingsPanel.classList.contains('sheet') ? 12 : settingsPanel.getBoundingClientRect().top;
-    const room = Math.floor((window.innerHeight - top - 12) / zoom);
+    const keybar = document.querySelector('.keybar');
+    const floor = keybar.offsetHeight ? keybar.getBoundingClientRect().top : window.innerHeight;
+    const room = Math.floor((floor - top - 12) / zoom);
     if (settingsPanel.offsetHeight > room) {
         settingsPanel.classList.add('tight');
         settingsPanel.style.maxHeight = `${Math.max(140, room)}px`;
@@ -1771,8 +1844,10 @@ document.addEventListener('keydown', (e) => {
         clearSearch();
     } else {
         // Поиск пуст: Esc снимает выбор статьи и возвращает курсор в поле поиска.
+        // На низком экране шапка не прилипает: если поле ушло за край окна, страница прокручивается к нему.
         selectByKeyboard(null);
-        searchField.focus({ preventScroll: true });
+        const sticky = getComputedStyle(document.querySelector('.top')).position === 'sticky';
+        searchField.focus({ preventScroll: sticky });
     }
 });
 
@@ -2148,3 +2223,20 @@ showWelcomeToast();
 loadData();
 loadProceduralData();
 loadMetaData();
+
+// ===== Обновление данных на открытой странице =====
+// Вкладку держат открытой часами: данные перечитываются раз в REFRESH_EVERY_MS, пока вкладка на экране,
+// и при возврате на неё. Выбор и раскрытые строки при этом остаются на месте.
+const REFRESH_EVERY_MS = 15 * 60 * 1000;
+let lastRefreshAt = Date.now();
+
+function refreshIfDue() {
+    if (document.visibilityState !== 'visible' || Date.now() - lastRefreshAt < REFRESH_EVERY_MS) return;
+    lastRefreshAt = Date.now();
+    loadData({ quiet: true });
+    loadProceduralData({ quiet: true });
+    loadMetaData();
+}
+
+document.addEventListener('visibilitychange', refreshIfDue);
+setInterval(refreshIfDue, 60 * 1000);
