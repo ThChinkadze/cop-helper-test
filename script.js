@@ -136,12 +136,62 @@ function rememberCopied(article) {
     const id = articleId(article);
     recentCopied = [id, ...recentCopied.filter(other => other !== id)].slice(0, RECENT_LIMIT);
     storeSet(RECENT_KEY, JSON.stringify(recentCopied));
-    renderRecentRow();
+    refreshRecentRow();
+}
+
+// ===== Появление и исчезновение строк шапки: «Найдено» и «Недавно скопированные» =====
+// Обе стоят под вкладками на одном месте. Какая из них была на экране до перерисовки, запоминается заранее:
+// на первой отрисовке списка место считается занятым, чтобы страница не открывалась с движением.
+// ghost — копия показанной строки на случай, если после перерисовки место опустеет.
+let headerRowsSeen = false;
+
+function headerRowsBefore() {
+    const foundRow = document.getElementById('foundRow');
+    const recentRow = document.getElementById('recentRow');
+    const found = Boolean(foundRow.firstChild);
+    const recent = Boolean(recentRow.firstChild);
+    const shown = found ? foundRow : (recent ? recentRow : null);
+    return { found, recent, slot: found || recent || !headerRowsSeen, ghost: shown ? shown.cloneNode(true) : null };
+}
+
+// Строка появилась на пустом месте — раздвигает шапку плавно (класс grow); сменила соседнюю — только проявляется.
+// У строки, которая уже была на экране, класс не трогается: его смена запустила бы движение заново.
+function markHeaderRow(row, wasShown, slotWasFilled) {
+    if (!wasShown && row.firstChild) row.classList.toggle('grow', !slotWasFilled);
+}
+
+// Строка исчезла, и место под вкладками опустело: на её месте остаётся копия, которая плавно сворачивается
+// и убирается. Копия ни на что не нажимается и в подсчётах не участвует; длительность — как в style.css.
+const HEADER_ROW_LEAVE_MS = 200;
+
+function leaveHeaderRow(before) {
+    const foundRow = document.getElementById('foundRow');
+    if (!before.ghost || foundRow.firstChild || document.getElementById('recentRow').firstChild) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const ghost = before.ghost;
+    ghost.removeAttribute('id');
+    ghost.classList.remove('grow');
+    ghost.classList.add('leave');
+    ghost.inert = true;
+    ghost.setAttribute('aria-hidden', 'true');
+    foundRow.before(ghost);
+    const remove = () => ghost.remove();
+    ghost.addEventListener('animationend', remove);
+    // Запасной путь: на скрытой вкладке движение не идёт и о своём конце не сообщает.
+    setTimeout(remove, HEADER_ROW_LEAVE_MS * 2);
+}
+
+// Перерисовка одной строки «Недавно скопированные» — после копирования, очистки и смены вида экрана.
+function refreshRecentRow() {
+    const before = headerRowsBefore();
+    renderRecentRow(before);
+    leaveHeaderRow(before);
 }
 
 // Строка «Недавно скопированные» в шапке, под вкладками; при поиске, на «Общей информации» и на сенсорном экране её нет.
 // Нажатие на номер копирует его снова, порядок в строке при этом не меняется.
-function renderRecentRow() {
+function renderRecentRow(before) {
     const row = document.getElementById('recentRow');
     row.innerHTML = '';
     if (currentCode === 'pk' || articlesLoadState !== 'ready' || listShowsSearch || touchQuery.matches) return;
@@ -173,13 +223,14 @@ function renderRecentRow() {
     clear.innerHTML = icon('i-x', 14);
     clear.addEventListener('click', clearRecentCopied);
     row.appendChild(clear);
+    markHeaderRow(row, before.recent, before.slot);
 }
 
 // Кнопка с крестиком в конце строки: список недавних очищается целиком.
 function clearRecentCopied() {
     recentCopied = [];
     storeRemove(RECENT_KEY);
-    renderRecentRow();
+    refreshRecentRow();
     showToast('Недавние очищены');
 }
 
@@ -1188,7 +1239,7 @@ function copyArticleNumber(article, { remember = true, cell = null } = {}) {
 
 // Строка «Найдено» в шапке, под вкладками: сколько статей в каждом кодексе и отбор по кодексу.
 // Показывается, только когда найденное лежит в нескольких кодексах.
-function renderFoundRow(counts) {
+function renderFoundRow(counts, before) {
     const codes = Object.keys(CODE_LABELS).filter(code => counts[code]);
     if (codes.length < 2) return;
 
@@ -1210,6 +1261,7 @@ function renderFoundRow(counts) {
             renderArticles();
         });
     });
+    markHeaderRow(row, before.found, before.slot);
     syncSwitchHint();
 }
 
@@ -1219,7 +1271,14 @@ function syncSwitchHint() {
     document.body.classList.toggle('no-switch', searching && !document.querySelector('#foundRow .chip'));
 }
 
-function renderArticles({ keepExpanded = false } = {}) {
+// Список перерисовывается в drawArticles; здесь — только строки шапки до и после перерисовки.
+function renderArticles(options) {
+    const headerRows = headerRowsBefore();
+    drawArticles(headerRows, options);
+    leaveHeaderRow(headerRows);
+}
+
+function drawArticles(headerRows, { keepExpanded = false } = {}) {
     const container = document.getElementById('articlesContainer');
 
     const rawQuery = document.getElementById('searchInput').value;
@@ -1309,8 +1368,9 @@ function renderArticles({ keepExpanded = false } = {}) {
         if (anchor) insertArticlePart(anchor, id, query, expandedIds.has(id));
     });
     restoreKeyboardSelection();
-    renderRecentRow();
-    if (query) renderFoundRow(counts);
+    renderRecentRow(headerRows);
+    if (query) renderFoundRow(counts, headerRows);
+    headerRowsSeen = true;
 
     if (!query && currentDisplayMode === 'compact') {
         const total = parsedDatabase.filter(article => article.code === currentCode).length;
@@ -1411,6 +1471,8 @@ function buildPartsHtml(article) {
 function revealInList(el, smooth = false) {
     // На низком экране шапка не прилипает и строку не закрывает.
     const header = document.querySelector('.top');
+    // Строка шапки ещё появляется — её движение завершается сразу, иначе высота шапки измерится неполной.
+    header.getAnimations({ subtree: true }).forEach(animation => animation.finish());
     const sticky = getComputedStyle(header).position === 'sticky';
     el.style.scrollMarginTop = `${(sticky ? header.offsetHeight : 0) + 8}px`;
     el.style.scrollMarginBottom = `${document.querySelector('.keybar').offsetHeight + 12}px`;
@@ -1763,7 +1825,7 @@ function syncTouchMode() {
 
 touchQuery.addEventListener('change', () => {
     syncTouchMode();
-    renderRecentRow();
+    refreshRecentRow();
 });
 syncTouchMode();
 

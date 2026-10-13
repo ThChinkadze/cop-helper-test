@@ -401,6 +401,7 @@ svg {
 .recent {
     display: flex;
     align-items: center;
+    height: 30px;
     margin-top: 12px;
 }
 
@@ -1376,6 +1377,56 @@ body:not(.keys-on) .search-kbd {
     }
 }
 
+/* Строки «Найдено» и «Недавно скопированные» появляются таким же движением, сверху — из-под вкладок.
+   Оно идёт, когда пустая строка получает содержимое; перерисовка уже показанной строки его не повторяет */
+.found,
+.recent {
+    animation: headRowIn .16s ease-out;
+}
+
+@keyframes headRowIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+}
+
+/* Место под вкладками было пустым (класс grow ставит скрипт): строка раздвигает шапку, и список под ней
+   съезжает плавно — так же, как при раскрытии описания статьи. На время движения строка обрезана по своей рамке */
+.found.grow,
+.recent.grow {
+    animation: headRowGrow .2s cubic-bezier(.4, 0, .2, 1);
+}
+
+@keyframes headRowGrow {
+    from {
+        height: 0;
+        margin-top: 0;
+        opacity: 0;
+        clip-path: inset(0);
+    }
+
+    to { clip-path: inset(0); }
+}
+
+/* Строка исчезла, и место под вкладками опустело: её копия (класс leave, ставит скрипт) сворачивается тем же движением */
+.found.leave,
+.recent.leave {
+    pointer-events: none;
+    animation: headRowLeave .2s cubic-bezier(.4, 0, .2, 1) forwards;
+}
+
+@keyframes headRowLeave {
+    from { clip-path: inset(0); }
+
+    to {
+        height: 0;
+        margin-top: 0;
+        opacity: 0;
+        clip-path: inset(0);
+    }
+}
+
 .panel.open { animation: panelIn .14s ease-out; }
 
 @keyframes panelIn {
@@ -1562,6 +1613,7 @@ body:not(.keys-on) .search-kbd {
 
     .found,
     .recent {
+        height: 34px;
         margin-top: 10px;
     }
 
