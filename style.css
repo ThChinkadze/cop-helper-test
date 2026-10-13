@@ -610,8 +610,6 @@ svg {
 .row.selected .num .ico { opacity: 1; }
 
 @media (hover: hover) and (pointer: fine) {
-    .row:hover .num .ico { opacity: 1; }
-
     .num:hover {
         background: var(--fill);
         color: var(--on-fill);
@@ -621,7 +619,20 @@ svg {
     .num:hover svg { color: var(--on-fill); }
 }
 
-/* После копирования ячейка ненадолго показывает «Скопировано» */
+/* После копирования ячейка ненадолго показывает «Скопировано» вместо номера */
+.num-done {
+    display: none;
+    align-items: center;
+    gap: 8px;
+}
+
+.num.copied .num-done { display: flex; }
+
+.num.copied .num-text,
+.num.copied .ico {
+    display: none;
+}
+
 .num.copied,
 .num.copied:hover {
     background: rgba(37, 185, 37, .14);
@@ -741,21 +752,19 @@ svg {
 .row.open .cell-chev { color: var(--accent-text); }
 .row.open .cell-chev svg { transform: rotate(180deg); }
 
-@media (hover: hover) and (pointer: fine) {
-    .row:hover { border-color: var(--l3); }
-}
-@media (hover: hover) and (pointer: fine) {
-    .row:hover .grid { background: var(--s2); }
-}
 
 .row.pinned { background: var(--s2); }
 
 /* Статья, выбранная стрелками с клавиатуры: рамка акцента и уголки-метки */
+/* У отмеченной строки снята только обрезка по рамке — иначе уголки, выступающие за строку, не видны.
+   Остальная изоляция (contain) та же, что у обычной строки: без неё на экране с дробным масштабом
+   текст внутри перерисовывался бы со сдвигом на долю точки */
 .row.selected {
     z-index: 1;
     border-color: var(--accent);
     box-shadow: 0 0 0 1px var(--accent);
-    content-visibility: visible; /* иначе уголки, выступающие за строку, обрезаются */
+    content-visibility: visible;
+    contain: layout style;
 }
 
 .row.selected::before,
@@ -1377,10 +1386,10 @@ body:not(.keys-on) .search-kbd {
     }
 }
 
-/* Строки «Найдено» и «Недавно скопированные» появляются таким же движением, сверху — из-под вкладок.
-   Оно идёт, когда пустая строка получает содержимое; перерисовка уже показанной строки его не повторяет */
-.found,
-.recent {
+/* Строки «Найдено» и «Недавно скопированные»: движение назначает скрипт классом и снимает его по окончании.
+   enter — строка сменила соседнюю на том же месте и проявляется сверху, из-под вкладок */
+.found.enter,
+.recent.enter {
     animation: headRowIn .16s ease-out;
 }
 
@@ -1391,8 +1400,8 @@ body:not(.keys-on) .search-kbd {
     }
 }
 
-/* Место под вкладками было пустым (класс grow ставит скрипт): строка раздвигает шапку, и список под ней
-   съезжает плавно — так же, как при раскрытии описания статьи. На время движения строка обрезана по своей рамке */
+/* grow — место под вкладками было пустым: строка раздвигает шапку, и список под ней съезжает плавно,
+   так же, как при раскрытии описания статьи. На время движения строка обрезана по своей рамке */
 .found.grow,
 .recent.grow {
     animation: headRowGrow .2s cubic-bezier(.4, 0, .2, 1);
@@ -1409,7 +1418,7 @@ body:not(.keys-on) .search-kbd {
     to { clip-path: inset(0); }
 }
 
-/* Строка исчезла, и место под вкладками опустело: её копия (класс leave, ставит скрипт) сворачивается тем же движением */
+/* leave — строка исчезла, и место под вкладками опустело: её копия сворачивается тем же движением */
 .found.leave,
 .recent.leave {
     pointer-events: none;

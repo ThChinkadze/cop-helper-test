@@ -75,8 +75,10 @@ let searchDebounceTimer;
 // Во время поиска: кодекс, которым ограничена выдача (null — все кодексы).
 let searchCodeFilter = null;
 
-// Статья, выбранная стрелками с клавиатуры, и текст запроса, по которому построена выдача.
+// Отмеченная статья — к ней относятся клавиши — и текст запроса, по которому построена выдача.
+// Отметку ставят стрелки или курсор мыши; поставленная мышью следует за курсором и снимается, когда он уходит со списка.
 let keyboardSelectedId = null;
+let markerByMouse = false;
 let renderedSearchText = '';
 // Показана ли сейчас выдача поиска (а не обычный список статей кодекса).
 let listShowsSearch = false;
@@ -140,58 +142,73 @@ function rememberCopied(article) {
 }
 
 // ===== Появление и исчезновение строк шапки: «Найдено» и «Недавно скопированные» =====
-// Обе стоят под вкладками на одном месте. Какая из них была на экране до перерисовки, запоминается заранее:
-// на первой отрисовке списка место считается занятым, чтобы страница не открывалась с движением.
-// ghost — копия показанной строки на случай, если после перерисовки место опустеет.
+// Обе стоят под вкладками на одном месте. Перерисовка идёт через updateHeaderRows: она сравнивает, какая строка
+// была на экране и какая стала, и сама назначает движение — классом enter, grow или сворачивающейся копией.
+// На первой отрисовке списка место считается занятым, чтобы страница не открывалась с движением шапки.
 let headerRowsSeen = false;
 
-function headerRowsBefore() {
-    const foundRow = document.getElementById('foundRow');
-    const recentRow = document.getElementById('recentRow');
-    const found = Boolean(foundRow.firstChild);
-    const recent = Boolean(recentRow.firstChild);
-    const shown = found ? foundRow : (recent ? recentRow : null);
-    return { found, recent, slot: found || recent || !headerRowsSeen, ghost: shown ? shown.cloneNode(true) : null };
+function shownHeaderRow() {
+    return ['foundRow', 'recentRow'].map(id => document.getElementById(id)).find(row => row.firstChild) || null;
 }
 
-// Строка появилась на пустом месте — раздвигает шапку плавно (класс grow); сменила соседнюю — только проявляется.
-// У строки, которая уже была на экране, класс не трогается: его смена запустила бы движение заново.
-function markHeaderRow(row, wasShown, slotWasFilled) {
-    if (!wasShown && row.firstChild) row.classList.toggle('grow', !slotWasFilled);
+function updateHeaderRows(draw) {
+    const before = shownHeaderRow();
+    // Содержимое прежней строки вынимается целиком: если место опустеет, оно уйдёт в сворачивающуюся копию.
+    const oldContent = document.createDocumentFragment();
+    if (before) oldContent.append(...before.childNodes);
+    const slotWasFilled = Boolean(before) || !headerRowsSeen;
+
+    draw();
+
+    const after = shownHeaderRow();
+    if (after && after !== before) {
+        // Появилась на пустом месте — плавно раздвигает шапку; сменила соседнюю строку — только проявляется.
+        after.classList.toggle('grow', !slotWasFilled);
+        after.classList.toggle('enter', slotWasFilled);
+    }
+    if (!after && before) leaveHeaderRow(before, oldContent);
 }
 
-// Строка исчезла, и место под вкладками опустело: на её месте остаётся копия, которая плавно сворачивается
-// и убирается. Копия ни на что не нажимается и в подсчётах не участвует; длительность — как в style.css.
-const HEADER_ROW_LEAVE_MS = 200;
-
-function leaveHeaderRow(before) {
-    const foundRow = document.getElementById('foundRow');
-    if (!before.ghost || foundRow.firstChild || document.getElementById('recentRow').firstChild) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-    const ghost = before.ghost;
+// Место под вкладками опустело: на месте строки остаётся её копия с прежним содержимым, которая плавно
+// сворачивается и убирается. Копия ни на что не нажимается и в подсчётах не участвует.
+function leaveHeaderRow(row, content) {
+    const ghost = row.cloneNode(false);
     ghost.removeAttribute('id');
-    ghost.classList.remove('grow');
+    ghost.classList.remove('enter', 'grow');
     ghost.classList.add('leave');
     ghost.inert = true;
     ghost.setAttribute('aria-hidden', 'true');
-    foundRow.before(ghost);
+    ghost.append(content);
+    row.before(ghost);
+
+    // Движение отключено (настройка «уменьшить движение») — копия не нужна.
+    const style = getComputedStyle(ghost);
+    if (style.animationName === 'none') {
+        ghost.remove();
+        return;
+    }
     const remove = () => ghost.remove();
     ghost.addEventListener('animationend', remove);
     // Запасной путь: на скрытой вкладке движение не идёт и о своём конце не сообщает.
-    setTimeout(remove, HEADER_ROW_LEAVE_MS * 2);
+    setTimeout(remove, parseFloat(style.animationDuration) * 2000);
 }
+
+// Класс движения снимается, когда оно закончилось: иначе оно могло бы повториться при следующей перерисовке.
+['foundRow', 'recentRow'].forEach(id => {
+    const row = document.getElementById(id);
+    row.addEventListener('animationend', (e) => {
+        if (e.target === row) row.classList.remove('enter', 'grow');
+    });
+});
 
 // Перерисовка одной строки «Недавно скопированные» — после копирования, очистки и смены вида экрана.
 function refreshRecentRow() {
-    const before = headerRowsBefore();
-    renderRecentRow(before);
-    leaveHeaderRow(before);
+    updateHeaderRows(renderRecentRow);
 }
 
 // Строка «Недавно скопированные» в шапке, под вкладками; при поиске, на «Общей информации» и на сенсорном экране её нет.
 // Нажатие на номер копирует его снова, порядок в строке при этом не меняется.
-function renderRecentRow(before) {
+function renderRecentRow() {
     const row = document.getElementById('recentRow');
     row.innerHTML = '';
     if (currentCode === 'pk' || articlesLoadState !== 'ready' || listShowsSearch || touchQuery.matches) return;
@@ -223,7 +240,6 @@ function renderRecentRow(before) {
     clear.innerHTML = icon('i-x', 14);
     clear.addEventListener('click', clearRecentCopied);
     row.appendChild(clear);
-    markHeaderRow(row, before.recent, before.slot);
 }
 
 // Кнопка с крестиком в конце строки: список недавних очищается целиком.
@@ -1198,17 +1214,12 @@ function showWelcomeToast() {
     showToast('Памятка по законодательной базе Orlando', WELCOME_TOAST_DURATION_MS);
 }
 
-// Ячейка номера ненадолго показывает «Скопировано».
+// Ячейка номера ненадолго показывает «Скопировано»: надпись уже лежит в ячейке, класс copied меняет её с номером.
 const COPIED_FLASH_MS = 1200;
 function flashCopied(cell) {
     if (cell.classList.contains('copied')) return;
-    const old = cell.innerHTML;
     cell.classList.add('copied');
-    cell.innerHTML = `${icon('i-check', 14)}Скопировано`;
-    setTimeout(() => {
-        cell.classList.remove('copied');
-        cell.innerHTML = old;
-    }, COPIED_FLASH_MS);
+    setTimeout(() => cell.classList.remove('copied'), COPIED_FLASH_MS);
 }
 
 // cell — ячейка номера в списке; при копировании из строки «Недавно скопированные» её нет.
@@ -1239,7 +1250,7 @@ function copyArticleNumber(article, { remember = true, cell = null } = {}) {
 
 // Строка «Найдено» в шапке, под вкладками: сколько статей в каждом кодексе и отбор по кодексу.
 // Показывается, только когда найденное лежит в нескольких кодексах.
-function renderFoundRow(counts, before) {
+function renderFoundRow(counts) {
     const codes = Object.keys(CODE_LABELS).filter(code => counts[code]);
     if (codes.length < 2) return;
 
@@ -1261,7 +1272,6 @@ function renderFoundRow(counts, before) {
             renderArticles();
         });
     });
-    markHeaderRow(row, before.found, before.slot);
     syncSwitchHint();
 }
 
@@ -1271,14 +1281,18 @@ function syncSwitchHint() {
     document.body.classList.toggle('no-switch', searching && !document.querySelector('#foundRow .chip'));
 }
 
-// Список перерисовывается в drawArticles; здесь — только строки шапки до и после перерисовки.
+// Список перерисовывается в drawArticles; движение строк шапки при этом назначает updateHeaderRows.
 function renderArticles(options) {
-    const headerRows = headerRowsBefore();
-    drawArticles(headerRows, options);
-    leaveHeaderRow(headerRows);
+    const hadMouseMarker = markerByMouse;
+    updateHeaderRows(() => drawArticles(options));
+    // Отмеченной мышью статьи в новом списке нет: отметка переходит на ту, что теперь под курсором.
+    if (hadMouseMarker && !keyboardSelectedId) {
+        markerByMouse = false;
+        if (hoverArmed && lastMouseX >= 0) markAt(document.elementFromPoint(lastMouseX, lastMouseY));
+    }
 }
 
-function drawArticles(headerRows, { keepExpanded = false } = {}) {
+function drawArticles({ keepExpanded = false } = {}) {
     const container = document.getElementById('articlesContainer');
 
     const rawQuery = document.getElementById('searchInput').value;
@@ -1368,8 +1382,8 @@ function drawArticles(headerRows, { keepExpanded = false } = {}) {
         if (anchor) insertArticlePart(anchor, id, query, expandedIds.has(id));
     });
     restoreKeyboardSelection();
-    renderRecentRow(headerRows);
-    if (query) renderFoundRow(counts, headerRows);
+    renderRecentRow();
+    if (query) renderFoundRow(counts);
     headerRowsSeen = true;
 
     if (!query && currentDisplayMode === 'compact') {
@@ -1549,7 +1563,7 @@ function buildListRow(article, query, isExpanded) {
 
     const cells = {
         code: buildCodeCell(article),
-        num: `<div class="cell num" title="Скопировать номер статьи"><span class="num-text">ст. ${highlightedNum}</span><span class="ico">${icon('i-copy', 14)}</span></div>`,
+        num: `<div class="cell num" title="Скопировать номер статьи"><span class="num-text">ст. ${highlightedNum}</span><span class="ico">${icon('i-copy', 14)}</span><span class="num-done">${icon('i-check', 14)}Скопировано</span></div>`,
         type: buildTypeCell(article),
         title: `<div class="cell cell-title">${buildPinButton(article)}<span title="${escapeHtml(article.title)}">${highlightedTitle}</span></div>`,
         extraUk: extraHtml,
@@ -1976,17 +1990,39 @@ function articleElements() {
 
 // Полоса подсказок показывает клавиши по обстановке: выбрана ли статья, открыта ли «Общая информация».
 function syncKeyHintState() {
-    document.body.classList.toggle('is-selected', Boolean(keyboardSelectedId));
+    document.body.classList.toggle('is-selected', Boolean(keyboardSelectedId) && !markerByMouse);
     document.body.classList.toggle('on-info', currentCode === 'pk');
 }
 
 function selectByKeyboard(el) {
     document.querySelectorAll('#articlesContainer .selected').forEach(other => other.classList.remove('selected'));
     keyboardSelectedId = el ? el.dataset.articleId : null;
+    markerByMouse = false;
     syncKeyHintState();
     if (!el) return;
     el.classList.add('selected');
     revealInList(el);
+}
+
+// Отметка переходит на статью под курсором мыши; страница при этом не прокручивается.
+// Без статьи (id пуст) снимается только отметка, поставленная мышью: выбор стрелками уход курсора не трогает.
+function markByMouse(id) {
+    if (id ? (id === keyboardSelectedId && markerByMouse) : !markerByMouse) return;
+    document.querySelectorAll('#articlesContainer .selected').forEach(other => other.classList.remove('selected'));
+    keyboardSelectedId = id;
+    markerByMouse = Boolean(id);
+    const el = id ? articleElements().find(item => item.dataset.articleId === id) : null;
+    if (el) el.classList.add('selected');
+    syncKeyHintState();
+}
+
+// Что под курсором: статья — отметка на неё; промежуток между строками списка — отметка остаётся;
+// всё остальное — отметка, поставленная мышью, снимается.
+function markAt(node) {
+    const id = articleIdAt(node);
+    if (!id && node instanceof Element && node.closest('#articlesContainer.list')) return;
+    hoverTargetId = id;
+    markByMouse(id);
 }
 
 // После перерисовки без смены выдачи (например, закрепление) выбор остаётся на той же статье.
@@ -2036,9 +2072,6 @@ function toggleSelectedDescription() {
     setTimeout(() => revealInList(el, true), 230);
 }
 
-zoomMinusBtn.title = 'Уменьшить (←)';
-zoomPlusBtn.title = 'Увеличить (→)';
-
 // Щелчок по полю поиска снимает выбор статьи: стрелки влево и вправо снова двигают курсор по тексту.
 searchField.addEventListener('mousedown', () => {
     selectByKeyboard(null);
@@ -2084,7 +2117,7 @@ function trackMouse(e) {
     // Мышь задели во время набора запроса — клавиатура остаётся главной. Нажатие кнопки мыши случайным не считается.
     if (!pressed && !hoverArmed && Date.now() - lastTypedAt < HOVER_AFTER_KEY_MS) return;
     hoverArmed = true;
-    hoverTargetId = articleIdAt(e.target);
+    markAt(e.target);
     hoverScrollY = window.scrollY;
     syncPointingState(e.target);
 }
@@ -2104,10 +2137,23 @@ document.addEventListener('wheel', (e) => {
 document.documentElement.addEventListener('mouseleave', () => {
     lastMouseX = -1;
     lastMouseY = -1;
-    hoverTargetId = null;
+    markAt(null);
     hoverScrollY = window.scrollY;
     syncPointingState(null);
 });
+
+// Страница прокручивается под неподвижным курсором: отметка переходит на статью, которая оказалась под ним.
+let markerScrollTicking = false;
+window.addEventListener('scroll', () => {
+    if (!hoverArmed || lastMouseX < 0 || markerScrollTicking) return;
+    markerScrollTicking = true;
+    requestAnimationFrame(() => {
+        markerScrollTicking = false;
+        if (!hoverArmed || lastMouseX < 0) return;
+        markAt(document.elementFromPoint(lastMouseX, lastMouseY));
+        hoverScrollY = window.scrollY;
+    });
+}, { passive: true });
 
 // Строка статьи под курсором — если мышью пользовались последней.
 function hoveredArticleEl() {
@@ -2140,6 +2186,15 @@ document.addEventListener('keydown', (e) => {
 
     if (e.code === 'KeyC' && e.ctrlKey && !e.altKey && !e.shiftKey) return;
     lastTypedAt = Date.now();
+    // Отметку, поставленную мышью, стрелки вверх и вниз подхватывают и ведут дальше; любая другая клавиша её снимает.
+    if (markerByMouse) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            markerByMouse = false;
+            syncKeyHintState();
+        } else {
+            markByMouse(null);
+        }
+    }
     disarmHover();
 }, true);
 
