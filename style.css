@@ -199,6 +199,11 @@ svg {
 
 .seg button:first-child { margin-left: 0; }
 
+/* «Статьи» — той же ширины и с тем же положением разделителя, что «Подсказки клавиш» */
+.seg:has(.mode-btn) { width: 166px; }
+.mode-btn:first-child { flex: 0 0 58.6%; }
+.mode-btn:last-child { flex: 1 1 0; }
+
 .seg button.on {
     position: relative;
     background: var(--fill);
