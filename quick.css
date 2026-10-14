@@ -1,0 +1,110 @@
+/* Быстрое окно программы для Windows. Строки, поле поиска и цвета — из style.css; здесь только то, чем окно отличается */
+
+/* Окно программы прозрачное: видно только поле и выдачу, под ними — игра */
+html {
+    overflow: hidden;
+    background-color: transparent;
+}
+
+body::before { display: none; }
+
+.quick { width: 100%; }
+
+.quick .search { background: var(--bg); }
+
+/* Окно гаснет плавно: длительность и кривая — как у появления строк на сайте */
+.quick.leaving {
+    opacity: 0;
+    transition: opacity .16s ease-out;
+}
+
+/* Выдача выезжает из-под поля; фон слегка прозрачный */
+.quick-results {
+    display: none;
+    position: relative;
+    background: rgba(29, 29, 29, .86);
+    border: 1px solid var(--l2);
+    border-top: none;
+}
+
+.quick.has-panel .quick-results { display: block; }
+
+.quick-list[hidden],
+.quick .recent[hidden] {
+    display: none;
+}
+
+/* Видно шесть строк, остальные — прокруткой внутри. Полосы браузера нет: её место не отнимается
+   у строк, а положение показывает тонкая метка в правом поле */
+.quick-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: calc(6 * 48px + 5 * 6px + 16px);
+    padding: 8px;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+.quick-list::-webkit-scrollbar { display: none; }
+
+.quick-thumb {
+    position: absolute;
+    right: 2px;
+    width: 3px;
+    background: var(--l3);
+}
+
+/* Пустое поле: под ним одна строка недавно скопированных; стрелка вниз разворачивает их в статьи */
+.quick .recent {
+    height: auto;
+    margin: 0;
+    padding: 8px;
+}
+
+.quick .recent .kbd { margin-left: 14px; }
+
+/* Номер из недавних скопирован: тот же зелёный вид, что у ячейки номера в строке статьи */
+.quick .chip.copied {
+    position: relative;
+    background: rgba(37, 185, 37, .14);
+    border-color: var(--money);
+    color: var(--money);
+}
+
+/* Сообщение вместо строк: ничего не найдено, база не загружена */
+.quick-note {
+    padding: 14px 8px;
+    font-size: 13px;
+    text-align: center;
+    color: var(--text2);
+}
+
+/* Строки на экране все: браузеру нечего откладывать, а уголки отмеченной строки не должны обрезаться */
+.quick .row { content-visibility: visible; }
+
+/* Пустое место наказания у статей АК и ДК: без линии и без прочерка */
+.quick .pen-none { border-left: none; }
+
+/* Длинное название делится на две примерно равные строки */
+.quick .cell-title span { text-wrap: balance; }
+
+/* Отметка «у статьи есть доп. мера» — подпись под штрафом, как «судимость» под сроком */
+.with-cap {
+    flex-direction: column;
+    gap: 0;
+}
+
+.pen-cap {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    line-height: 1.1;
+    color: var(--text2);
+}
+
+/* Доп. мера — в раскрытом описании, под текстом статьи */
+.desc-extra {
+    font-size: 14px;
+    font-weight: 600;
+}

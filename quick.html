@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>Cop Helper — быстрый поиск</title>
+    <!-- Быстрое окно программы для Windows: поле поиска и выдача поверх игры. В браузере посетителям не нужно -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" crossorigin>
+    <!-- Стили и скрипты подключаются с меткой времени: всегда берутся свежие файлы, а не сохранённая копия -->
+    <script>document.write('<link rel="stylesheet" href="style.css?v=' + Date.now() + '"><link rel="stylesheet" href="quick.css?v=' + Date.now() + '">');</script>
+</head>
+<body>
+
+    <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M16 16L21 21"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12L10 17L19 7"/></symbol>
+        <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11"/><path d="M5 15H4V4H15V5"/></symbol>
+        <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9L12 15L18 9"/></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6L18 18M18 6L6 18"/></symbol>
+    </svg>
+
+    <div class="quick" id="quick">
+        <div class="search">
+            <div class="search-icon"><svg width="18" height="18"><use href="#i-search"/></svg></div>
+            <input type="text" id="searchInput" placeholder="Опишите ситуацию, введите фразу или номер..." aria-label="Поиск статьи" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+            <div class="search-kbd"><kbd class="kbd">Esc</kbd></div>
+        </div>
+        <div class="quick-results">
+            <div class="recent" id="recentRow"></div>
+            <div class="quick-list" id="results"></div>
+            <div class="quick-thumb" id="thumb"></div>
+        </div>
+    </div>
+
+    <script>document.write('<script src="core.js?v=' + Date.now() + '"><\/script><script src="quick.js?v=' + Date.now() + '"><\/script>');</script>
+</body>
+</html>

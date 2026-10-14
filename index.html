@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" data-page="2">
+<html lang="ru" data-page="3">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -17,7 +17,7 @@
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" href="favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" crossorigin>
     <!-- Стили и скрипт подключаются с меткой времени: браузер всегда берёт свежие файлы, а не сохранённую копию -->
     <script>document.write('<link rel="stylesheet" href="style.css?v=' + Date.now() + '">');</script>
 </head>
@@ -85,6 +85,19 @@
                                     <button class="hints-btn" type="button" data-hints="off" aria-pressed="false">Скрыть</button>
                                 </div>
                             </div>
+                            <div class="setting desktop-only">
+                                <span>Быстрый поиск</span>
+                                <div class="seg">
+                                    <button class="hotkey-btn" id="hotkeyBtn" type="button" title="Сменить сочетание клавиш">Выбрать</button>
+                                </div>
+                            </div>
+                            <div class="setting desktop-only">
+                                <span>Запуск с Windows</span>
+                                <div class="seg" role="group" aria-label="Запуск вместе с Windows">
+                                    <button class="autostart-btn" type="button" data-autostart="on" aria-pressed="false">Включён</button>
+                                    <button class="autostart-btn on" type="button" data-autostart="off" aria-pressed="true">Выключен</button>
+                                </div>
+                            </div>
                             <div class="panel-keys no-touch">
                                 <span class="label">Клавиши</span>
                                 <div class="keyrow"><span>Выбрать статью</span><span class="keys"><kbd class="kbd">↑</kbd><kbd class="kbd">↓</kbd></span></div>
@@ -130,6 +143,20 @@
         </div>
     </div>
 
-    <script>document.write('<script src="script.js?v=' + Date.now() + '"><\/script>');</script>
+    <!-- Окно выбора сочетания клавиш: открывается только в программе для Windows -->
+    <div class="hotkey-veil" id="hotkeyDialog" role="dialog" aria-modal="true" aria-labelledby="hotkeyTitle">
+        <div class="hotkey-box">
+            <div class="hotkey-title" id="hotkeyTitle">Сочетание клавиш для поиска</div>
+            <div class="hotkey-hint">Им вы будете вызывать поиск по памятке из любой программы и из игры. Нажмите сочетание, которое не занято в игре.</div>
+            <div class="hotkey-combo" id="hotkeyCombo"></div>
+            <div class="hotkey-note" id="hotkeyNote"></div>
+            <div class="hotkey-actions">
+                <button class="btn primary" id="hotkeySaveBtn" type="button">Сохранить</button>
+                <button class="btn" id="hotkeyCancelBtn" type="button">Не сейчас</button>
+            </div>
+        </div>
+    </div>
+
+    <script>document.write('<script src="core.js?v=' + Date.now() + '"><\/script><script src="script.js?v=' + Date.now() + '"><\/script>');</script>
 </body>
 </html>
