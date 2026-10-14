@@ -16,8 +16,8 @@ self.addEventListener('fetch', (e) => {
     const url = new URL(request.url);
     const isOwn = url.origin === self.location.origin;
     const isFont = url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
-    // Таблица с базой и всё прочее идут мимо, как обычно
-    if (!isOwn && !isFont) return;
+    // Таблица с базой и всё прочее идут мимо, как обычно; файл программы для Windows копить незачем
+    if ((!isOwn && !isFont) || url.pathname.endsWith('.exe')) return;
 
     // У своих файлов метка времени (?v=…, ?fresh=…) в ключ не входит: копия у каждого файла одна
     const key = isOwn ? url.origin + url.pathname : request.url;

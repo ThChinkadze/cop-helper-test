@@ -1116,6 +1116,9 @@ syncTouchMode();
 // Программе от страницы: ready, hotkeyOpen, hotkeyTry, hotkeySave, hotkeyCancel, autostartSet.
 const desktopApp = window.chrome && window.chrome.webview;
 
+// Ссылка «скачать программу» показывается только на Windows (в самой программе её прячут стили)
+if (/Win/.test(navigator.platform)) document.documentElement.classList.add('windows');
+
 if (desktopApp) {
     const hotkeyBtn = document.getElementById('hotkeyBtn');
     const hotkeyDialog = document.getElementById('hotkeyDialog');

@@ -213,6 +213,38 @@ svg {
     padding: 0;
 }
 
+/* Ссылка на программу для Windows — в настройках и внизу страницы. Видна только в браузере на Windows:
+   не в самой программе, не на телефоне и не на другой системе */
+.get-app,
+.setting.get-app {
+    display: none;
+}
+
+.windows:not(.desktop) .get-app { display: inline-flex; }
+.windows:not(.desktop) .setting.get-app { display: flex; }
+.windows:not(.desktop) .touch .get-app { display: none; }
+
+/* Кнопка-ссылка в настройках: вид и ширина — как у кнопки сочетания клавиш */
+.get-app-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 28px;
+    min-width: 166px;
+    padding: 0 11px;
+    background: var(--s1);
+    border: 1px solid var(--l2);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+    transition: background-color .12s;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .get-app-link:hover { background: var(--s2); }
+}
+
 /* Настройки, которые есть только в программе для Windows: в браузере их не видно */
 .setting.desktop-only { display: none; }
 .desktop .setting.desktop-only { display: flex; }
