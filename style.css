@@ -204,9 +204,14 @@ svg {
 .mode-btn:first-child { flex: 0 0 58.6%; }
 .mode-btn:last-child { flex: 1 1 0; }
 
-/* «Запуск с Windows» — той же ширины, кнопки пополам */
+/* «Запуск с Windows» — той же ширины, кнопки пополам; поля у кнопок убраны, иначе «Выключен» не помещается в половину */
 .seg:has(.autostart-btn) { width: 166px; }
-.autostart-btn { flex: 1 1 0; }
+
+.autostart-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0;
+}
 
 /* Настройки, которые есть только в программе для Windows: в браузере их не видно */
 .setting.desktop-only { display: none; }
