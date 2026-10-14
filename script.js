@@ -2,7 +2,7 @@
 // Браузер может несколько минут держать в памяти старый index.html, а этот файл всегда берётся свежим.
 // Если страница старее, чем нужна скрипту, она один раз запрашивается заново в обход сохранённой копии.
 // При правке разметки, от которой зависит скрипт, число увеличивается здесь и в data-page у <html>.
-const PAGE_VERSION = '3';
+const PAGE_VERSION = '4';
 const FRESH_PAGE_RE = /[?&]fresh=/;
 
 if (document.documentElement.dataset.page !== PAGE_VERSION) {
@@ -1107,13 +1107,14 @@ touchQuery.addEventListener('change', () => {
 syncTouchMode();
 
 // ===== Программа для Windows =====
-// Страница открыта внутри программы Cop Helper: в настройках появляются сочетание клавиш быстрого поиска
-// и запуск вместе с Windows.
+// Страница открыта внутри программы Cop Helper: в настройках появляются сочетание клавиш быстрого поиска,
+// запуск вместе с Windows и удаление программы.
 // Страница показывает сочетание и окно его выбора. Проверяет, называет и хранит сочетание программа:
 // только она знает, не занято ли оно другой программой.
 // Странице от программы: hotkey — действующее сочетание; hotkeyAsk — открыть окно (первый запуск);
-// hotkeyTried — как называется нажатое сочетание и чем оно не подходит; autostart — включён ли запуск с Windows.
-// Программе от страницы: ready, hotkeyOpen, hotkeyTry, hotkeySave, hotkeyCancel, autostartSet.
+// hotkeyTried — как называется нажатое сочетание и чем оно не подходит; autostart — включён ли запуск с Windows;
+// can — что умеет эта версия программы (старые версии умеют не всё).
+// Программе от страницы: ready, hotkeyOpen, hotkeyTry, hotkeySave, hotkeyCancel, autostartSet, uninstall.
 const desktopApp = window.chrome && window.chrome.webview;
 
 // Ссылка «скачать программу» показывается только на Windows (в самой программе её прячут стили)
@@ -1156,6 +1157,9 @@ if (desktopApp) {
             openHotkeyDialog();
         } else if (message.type === 'hotkeyTried') {
             showTriedHotkey(message.text, message.problem);
+        } else if (message.type === 'can' && message.what === 'uninstall') {
+            // Программа умеет удалять себя: в настройках появляется строка удаления
+            document.documentElement.classList.add('can-uninstall');
         } else if (message.type === 'autostart') {
             // Включён ли запуск, знает программа: кнопки показывают её ответ
             const isOn = message.on === '1';
@@ -1175,8 +1179,26 @@ if (desktopApp) {
     hotkeySaveBtn.addEventListener('click', () => closeHotkeyDialog(true));
     document.getElementById('hotkeyCancelBtn').addEventListener('click', () => closeHotkeyDialog(false));
 
+    // Удаление программы: страница только спрашивает подтверждение, удаляет программа
+    const uninstallDialog = document.getElementById('uninstallDialog');
+    const closeUninstallDialog = () => uninstallDialog.classList.remove('open');
+
+    document.getElementById('uninstallBtn').addEventListener('click', () => uninstallDialog.classList.add('open'));
+    document.getElementById('uninstallCancelBtn').addEventListener('click', closeUninstallDialog);
+    document.getElementById('uninstallConfirmBtn').addEventListener('click', () => {
+        closeUninstallDialog();
+        desktopApp.postMessage({ type: 'uninstall' });
+    });
+
     // Пока окно открыто, все клавиши достаются ему: остальная страница на них не отзывается
     document.addEventListener('keydown', (e) => {
+        if (uninstallDialog.classList.contains('open')) {
+            // Удаление подтверждается только кнопкой; Esc закрывает окно
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            if (e.key === 'Escape') closeUninstallDialog();
+            return;
+        }
         if (!hotkeyDialog.classList.contains('open')) return;
         e.preventDefault();
         e.stopImmediatePropagation();

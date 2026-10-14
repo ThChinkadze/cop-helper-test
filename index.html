@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" data-page="3">
+<html lang="ru" data-page="4">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -92,7 +92,7 @@
                             <div class="setting desktop-only">
                                 <span>Быстрый поиск</span>
                                 <div class="seg">
-                                    <button class="hotkey-btn" id="hotkeyBtn" type="button" title="Сменить сочетание клавиш">Выбрать</button>
+                                    <button class="setting-btn" id="hotkeyBtn" type="button" title="Сменить сочетание клавиш">Выбрать</button>
                                 </div>
                             </div>
                             <div class="setting desktop-only">
@@ -100,6 +100,12 @@
                                 <div class="seg" role="group" aria-label="Запуск вместе с Windows">
                                     <button class="autostart-btn" type="button" data-autostart="on" aria-pressed="false">Включён</button>
                                     <button class="autostart-btn on" type="button" data-autostart="off" aria-pressed="true">Выключен</button>
+                                </div>
+                            </div>
+                            <div class="setting desktop-only needs-uninstall">
+                                <span>Удаление программы</span>
+                                <div class="seg">
+                                    <button class="setting-btn" id="uninstallBtn" type="button">Удалить</button>
                                 </div>
                             </div>
                             <div class="panel-keys no-touch">
@@ -149,15 +155,27 @@
     </div>
 
     <!-- Окно выбора сочетания клавиш: открывается только в программе для Windows -->
-    <div class="hotkey-veil" id="hotkeyDialog" role="dialog" aria-modal="true" aria-labelledby="hotkeyTitle">
-        <div class="hotkey-box">
-            <div class="hotkey-title" id="hotkeyTitle">Сочетание клавиш для поиска</div>
-            <div class="hotkey-hint">Им вы будете вызывать поиск по памятке из любой программы и из игры. Нажмите сочетание, которое не занято в игре.</div>
+    <div class="dialog-veil" id="hotkeyDialog" role="dialog" aria-modal="true" aria-labelledby="hotkeyTitle">
+        <div class="dialog-box">
+            <div class="dialog-title" id="hotkeyTitle">Сочетание клавиш для поиска</div>
+            <div class="dialog-text">Им вы будете вызывать поиск по памятке из любой программы и из игры. Нажмите сочетание, которое не занято в игре.</div>
             <div class="hotkey-combo" id="hotkeyCombo"></div>
             <div class="hotkey-note" id="hotkeyNote"></div>
-            <div class="hotkey-actions">
+            <div class="dialog-actions">
                 <button class="btn primary" id="hotkeySaveBtn" type="button">Сохранить</button>
                 <button class="btn" id="hotkeyCancelBtn" type="button">Не сейчас</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Подтверждение удаления программы: тоже только в программе для Windows -->
+    <div class="dialog-veil" id="uninstallDialog" role="dialog" aria-modal="true" aria-labelledby="uninstallTitle">
+        <div class="dialog-box">
+            <div class="dialog-title" id="uninstallTitle">Удалить Cop Helper с компьютера?</div>
+            <div class="dialog-text">Удалятся программа, её настройки, закреплённые и недавние статьи. Памятка на сайте останется.</div>
+            <div class="dialog-actions">
+                <button class="btn danger" id="uninstallConfirmBtn" type="button">Удалить</button>
+                <button class="btn" id="uninstallCancelBtn" type="button">Отмена</button>
             </div>
         </div>
     </div>

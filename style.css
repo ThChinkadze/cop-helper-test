@@ -249,14 +249,17 @@ svg {
 .setting.desktop-only { display: none; }
 .desktop .setting.desktop-only { display: flex; }
 
-/* Сочетание клавиш быстрого поиска: кнопка той же ширины, что переключатели над ней */
-.hotkey-btn {
+/* Строка удаления видна, только если программа сообщила, что умеет удалять себя (с версии 1.1) */
+.desktop:not(.can-uninstall) .setting.needs-uninstall { display: none; }
+
+/* Одиночная кнопка в настройках (сочетание клавиш, удаление программы) — той же ширины, что переключатели над ней */
+.setting-btn {
     min-width: 166px;
     color: var(--text);
 }
 
 @media (hover: hover) and (pointer: fine) {
-    .hotkey-btn:hover { background: var(--s2); }
+    .setting-btn:hover { background: var(--s2); }
 }
 
 /* Главная кнопка: заливка акцента */
@@ -278,9 +281,16 @@ svg {
     .btn:disabled:hover { background: var(--s1); }
 }
 
-/* ===== Окно выбора сочетания клавиш (только в программе для Windows) ===== */
+/* Кнопка необратимого действия */
+.btn.danger {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: var(--code-on);
+}
 
-.hotkey-veil {
+/* ===== Окна поверх страницы: выбор сочетания клавиш и удаление программы (только в программе для Windows) ===== */
+
+.dialog-veil {
     display: none;
     position: fixed;
     inset: 0;
@@ -291,9 +301,9 @@ svg {
     background: rgba(0, 0, 0, .5);
 }
 
-.hotkey-veil.open { display: flex; }
+.dialog-veil.open { display: flex; }
 
-.hotkey-box {
+.dialog-box {
     width: 440px;
     max-width: 100%;
     padding: 22px 24px 24px;
@@ -302,12 +312,12 @@ svg {
     box-shadow: 6px 6px 0 rgba(0, 0, 0, .4);
 }
 
-.hotkey-title {
+.dialog-title {
     font-size: 16px;
     font-weight: 700;
 }
 
-.hotkey-hint {
+.dialog-text {
     margin-top: 8px;
     font-size: 13px;
     color: var(--text2);
@@ -341,12 +351,15 @@ svg {
     color: var(--danger);
 }
 
-.hotkey-actions {
+.dialog-actions {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
     margin-top: 10px;
 }
+
+/* Без поля и строки причины кнопки стояли бы вплотную к тексту */
+.dialog-text + .dialog-actions { margin-top: 24px; }
 
 .seg button.on {
     position: relative;
