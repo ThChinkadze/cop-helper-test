@@ -207,7 +207,8 @@ svg {
 /* «Запуск с Windows» — той же ширины, кнопки пополам; поля у кнопок убраны, иначе «Выключен» не помещается в половину */
 .seg:has(.autostart-btn) { width: 166px; }
 
-.autostart-btn {
+/* Через .seg: иначе поля кнопки возвращает правило .seg button */
+.seg .autostart-btn {
     flex: 1 1 0;
     min-width: 0;
     padding: 0;
