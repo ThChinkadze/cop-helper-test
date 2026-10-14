@@ -60,9 +60,6 @@ async function refreshArticles() {
 
 // ===== Строка статьи =====
 
-// Значок из набора в quick.html
-const icon = id => `<svg width="14" height="14" aria-hidden="true"><use href="#${id}"/></svg>`;
-
 function buildRow(article, query, index) {
     const isUk = article.code === 'uk';
     const has = { fine: article.fine, stars: article.stars, term: article.arrest };
@@ -111,12 +108,6 @@ function buildRow(article, query, index) {
 
 // ===== Отрисовка =====
 
-function recentArticles() {
-    return recentCopied
-        .map(id => parsedDatabase.find(article => articleId(article) === id))
-        .filter(Boolean);
-}
-
 function draw() {
     const recent = recentArticles();
     let query = null;
@@ -146,7 +137,7 @@ function draw() {
 
     strip.hidden = mode !== 'idle' || recent.length === 0;
     strip.innerHTML = '<span class="label">Недавние</span><div class="chips">'
-        + recent.map((article, index) => `<button type="button" class="chip" data-index="${index}" title="${escapeHtml(article.title)} — скопировать номер">${escapeHtml(copyText(article))}</button>`).join('')
+        + recent.map((article, index) => `<button type="button" class="chip" data-index="${index}" title="${escapeHtml(article.title)} — скопировать номер">${escapeHtml(articleCopyText(article))}</button>`).join('')
         + `</div><button type="button" class="recent-clear" title="Очистить недавние" aria-label="Очистить недавние">${icon('i-x')}</button><kbd class="kbd">↓</kbd>`;
 
     quick.classList.toggle('has-query', input.value !== '');
@@ -199,15 +190,12 @@ function toggleRow(row) {
     row.classList.toggle('open');
 }
 
-// Что уходит в буфер обмена — как в памятке: «ст. 6.1 ч.1 УК»
-const copyText = article => `ст. ${article.num} ${CODE_LABELS[article.code] || ''}`.trim();
-
 // Номер — в буфер обмена, статья встаёт первой в недавних, место нажатия (ячейка номера или номер в недавних)
 // становится зелёным, и через мгновение окно закрывается
 function copyArticle(article, place) {
     if (place.classList.contains('copied')) return;
 
-    const text = copyText(article);
+    const text = articleCopyText(article);
     const done = () => {
         storeRecentCopied(article);
         place.classList.add('copied');

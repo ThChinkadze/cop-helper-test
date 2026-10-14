@@ -1,5 +1,5 @@
-// Общая часть памятки и быстрого окна программы для Windows: хранение, загрузка и разбор базы, поиск.
-// Со страницей этот файл не работает — только с данными. Подключается перед script.js и перед quick.js.
+// Общая часть памятки и быстрого окна программы для Windows: хранение, загрузка и разбор базы, поиск,
+// части строки статьи. Элементов страницы этот файл не трогает. Подключается перед script.js и перед quick.js.
 
 // ===== Работа без интернета =====
 // sw.js сохраняет файлы сайта и отдаёт их, когда сеть не отвечает; статьи хранит кэш данных ниже.
@@ -94,6 +94,13 @@ function dropRecentCopied() {
     storeRemove(RECENT_KEY);
 }
 
+// Недавние статьи по порядку; удалённые из базы пропускаются.
+function recentArticles() {
+    return recentCopied
+        .map(id => parsedDatabase.find(article => articleId(article) === id))
+        .filter(Boolean);
+}
+
 // ===== Кодексы и колонки таблицы =====
 const CODE_NAMES = {
     'uk': 'Уголовный кодекс',
@@ -126,7 +133,7 @@ const TYPE_LABELS = {
     'В': 'Военная'
 };
 
-// Индексы колонок листа "База данных" — только для loadData()
+// Индексы колонок листа "База данных" — только для разбора листа
 const COL = {
     CODE: 0,
     NUM: 1,
@@ -747,6 +754,16 @@ function highlightArticleNum(num, query) {
 }
 
 // ===== Части строки статьи, общие для памятки и быстрого окна =====
+
+// Значок из набора <symbol> на странице.
+function icon(id, size = 14) {
+    return `<svg width="${size}" height="${size}" aria-hidden="true"><use href="#${id}"/></svg>`;
+}
+
+// Что уходит в буфер обмена при копировании номера и что написано на номерах в строке недавних: «ст. 6.1 ч.1 УК».
+function articleCopyText(article) {
+    return `ст. ${article.num} ${CODE_LABELS[article.code] || ''}`.trim();
+}
 
 function hasFelonyRecord(article) {
     return article.felony.toLowerCase().includes('судимость');
