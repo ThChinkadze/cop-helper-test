@@ -1619,3 +1619,17 @@ function refreshIfDue() {
 
 document.addEventListener('visibilitychange', refreshIfDue);
 setInterval(refreshIfDue, 60 * 1000);
+
+// ===== Новая версия сайта =====
+// Страница перезагружается сама, когда на сайте вышла новая версия, но только если это не помешает:
+// окно спрятано, либо открыто, но минуту ничего не нажимали, поиск пуст, ни настройки, ни окон, ни описаний нет.
+let lastActivityAt = Date.now();
+['keydown', 'pointerdown', 'wheel'].forEach(type => document.addEventListener(type, () => { lastActivityAt = Date.now(); }, true));
+
+watchSiteVersion(() => {
+    if (document.visibilityState !== 'visible') return true;
+    return Date.now() - lastActivityAt > 60 * 1000
+        && !searchField.value
+        && !settingsPanel.classList.contains('open')
+        && !document.querySelector('.dialog-veil.open, .row.open');
+});

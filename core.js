@@ -787,3 +787,33 @@ function wrapBeforeWord(text, word) {
     return text.split(new RegExp(`\\s+(?=${word}\\s)`))
         .map(part => `<span class="nw">${escapeHtml(part)}</span>`).join(' ');
 }
+
+// ===== Новая версия сайта =====
+// Страницу в программе и во вкладке держат открытой часами. При каждой публикации publish.sh кладёт на сайт
+// site-version.txt — отпечаток файлов сайта. Страница сверяется с ним и, когда версия сменилась, а человеку
+// это не помешает (isIdle), загружается заново — в обход сохранённой копии. Само приложение при этом не меняется.
+const SITE_VERSION_EVERY_MS = 2 * 60 * 1000;
+
+function watchSiteVersion(isIdle) {
+    let known = null;
+
+    const check = async () => {
+        try {
+            const response = await fetch(`site-version.txt?t=${Date.now()}`, { cache: 'no-store' });
+            if (!response.ok) return;
+            const version = (await response.text()).trim();
+            // Не отпечаток (страница-заглушка вместо файла) — не версия
+            if (!/^[0-9a-f]{16}$/.test(version)) return;
+            if (known === null) known = version;
+            else if (version !== known && isIdle()) location.replace(`${location.pathname}?fresh=${Date.now()}`);
+        } catch (e) {
+            // Нет связи — версию сверим в следующий раз
+        }
+    };
+
+    check();
+    setInterval(check, SITE_VERSION_EVERY_MS);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') check();
+    });
+}

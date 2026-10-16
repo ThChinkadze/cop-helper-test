@@ -316,3 +316,7 @@ if (desktopApp) {
 }
 
 openQuick();
+
+// ===== Новая версия сайта =====
+// Быстрое окно перезагружается, только пока оно закрыто: с открытым окном человек ищет статью
+watchSiteVersion(() => document.visibilityState !== 'visible');
