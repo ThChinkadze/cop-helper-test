@@ -15,6 +15,56 @@ const desktopApp = window.chrome && window.chrome.webview;
 // Ссылка «скачать программу» показывается только на Windows (в самой программе её прячут стили)
 if (/Win/.test(navigator.platform)) document.documentElement.classList.add('windows');
 
+// ===== Скачивание программы =====
+// Перед скачиванием открывается окно: что делать, если Windows предупредит о файле (у программы нет платной подписи).
+// Без скрипта ссылки качают установщик сразу.
+const downloadDialog = document.getElementById('downloadDialog');
+const downloadGoBtn = document.getElementById('downloadGoBtn');
+const downloadCancelBtn = document.getElementById('downloadCancelBtn');
+let downloadOpener = null;
+
+const closeDownloadDialog = () => {
+    downloadDialog.classList.remove('open');
+    if (downloadOpener) downloadOpener.focus();
+    downloadOpener = null;
+};
+
+document.querySelectorAll('[data-get-app]').forEach(link => link.addEventListener('click', (e) => {
+    e.preventDefault();
+    downloadOpener = link;
+    downloadDialog.classList.add('open');
+    // Позже щелчка: иначе страница под окном успевает забрать фокус обратно
+    setTimeout(() => downloadGoBtn.focus(), 0);
+}));
+
+// Скачивание началось: фокус возвращать некуда, окно просто закрывается
+downloadGoBtn.addEventListener('click', () => {
+    downloadOpener = null;
+    closeDownloadDialog();
+});
+downloadCancelBtn.addEventListener('click', closeDownloadDialog);
+
+// Щелчок в окне не закрывает панель настроек под ним; щелчок по затемнению закрывает само окно
+downloadDialog.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (e.target === downloadDialog) closeDownloadDialog();
+});
+
+// Пока окно открыто, клавиши достаются ему: Esc закрывает, Tab ходит между двумя кнопками
+document.addEventListener('keydown', (e) => {
+    if (!downloadDialog.classList.contains('open')) return;
+    e.stopImmediatePropagation();
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        closeDownloadDialog();
+    } else if (e.key === 'Tab') {
+        e.preventDefault();
+        const buttons = [downloadGoBtn, downloadCancelBtn];
+        const at = buttons.indexOf(document.activeElement);
+        buttons[(at + (e.shiftKey ? buttons.length - 1 : 1)) % buttons.length].focus();
+    }
+}, true);
+
 if (desktopApp) {
     const hotkeyBtn = document.getElementById('hotkeyBtn');
     const hotkeyDialog = document.getElementById('hotkeyDialog');

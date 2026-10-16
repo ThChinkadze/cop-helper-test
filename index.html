@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" data-page="5">
+<html lang="ru" data-page="6">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -87,7 +87,7 @@
                             </div>
                             <div class="setting get-app">
                                 <span>Программа для ПК</span>
-                                <a class="get-app-link" href="CopHelper.exe" download>Скачать</a>
+                                <a class="get-app-link" href="CopHelper-Setup.exe" download data-get-app>Скачать</a>
                             </div>
                             <div class="setting desktop-only">
                                 <span>Быстрый поиск</span>
@@ -130,7 +130,7 @@
             <footer class="footer">
                 <a class="btn" href="https://www.donationalerts.com/r/rezotoridze" target="_blank" rel="noopener">Донат</a>
                 <a class="btn" href="https://discordapp.com/users/1016726999420653709" target="_blank" rel="noopener">Discord</a>
-                <a class="btn get-app" href="CopHelper.exe" download>Программа для ПК</a>
+                <a class="btn get-app" href="CopHelper-Setup.exe" download data-get-app>Программа для ПК</a>
                 <span>Проект от Rezo Toridze</span>
                 <span class="sp"></span>
                 <span class="footer-meta-date"></span>
@@ -176,6 +176,23 @@
             <div class="dialog-actions">
                 <button class="btn danger" id="uninstallConfirmBtn" type="button">Удалить</button>
                 <button class="btn" id="uninstallCancelBtn" type="button">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Перед скачиванием программы: что делать, если Windows предупредит о файле. Показывается только в браузере на Windows -->
+    <div class="dialog-veil" id="downloadDialog" role="dialog" aria-modal="true" aria-labelledby="downloadTitle">
+        <div class="dialog-box">
+            <div class="dialog-title" id="downloadTitle">Скачать программу для Windows</div>
+            <div class="dialog-text">Windows может предупредить, что файл неизвестен: у программы нет платной цифровой подписи. Если вы доверяете сайту, сделайте так:</div>
+            <ol class="dialog-steps">
+                <li>Браузер может предупредить о файле — выберите «Сохранить» или «Всё равно сохранить».</li>
+                <li>Запустите скачанный файл. Если появится синее окно «Windows защитила ваш компьютер», нажмите «Подробнее».</li>
+                <li>Затем нажмите «Выполнить в любом случае» — начнётся установка.</li>
+            </ol>
+            <div class="dialog-actions">
+                <a class="btn primary" id="downloadGoBtn" href="CopHelper-Setup.exe" download>Скачать</a>
+                <button class="btn" id="downloadCancelBtn" type="button">Отмена</button>
             </div>
         </div>
     </div>

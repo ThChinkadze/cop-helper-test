@@ -278,7 +278,8 @@ svg {
 }
 
 @media (hover: hover) and (pointer: fine) {
-    .btn.primary:hover:enabled { background: var(--accent); }
+    .btn.primary:hover:enabled,
+    a.btn.primary:hover { background: var(--accent); }
     .btn:disabled:hover { background: var(--s1); }
 }
 
@@ -360,7 +361,19 @@ svg {
 }
 
 /* Без поля и строки причины кнопки стояли бы вплотную к тексту */
-.dialog-text + .dialog-actions { margin-top: 24px; }
+.dialog-text + .dialog-actions,
+.dialog-steps + .dialog-actions { margin-top: 24px; }
+
+/* Шаги в окне перед скачиванием программы */
+.dialog-steps {
+    margin: 14px 0 0;
+    padding-left: 20px;
+    font-size: 13px;
+    color: var(--text2);
+}
+
+.dialog-steps li + li { margin-top: 8px; }
+.dialog-steps li::marker { font-weight: 700; color: var(--text3); }
 
 .seg button.on {
     position: relative;
